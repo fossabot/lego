@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
+	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"
 )
 
@@ -42,4 +44,54 @@ func (c *Context) Head(code int) Renderer {
 // Redirect returns an HTTP redirection response
 func (c *Context) Redirect(url string) Renderer {
 	return &RenderRedirect{URL: url}
+}
+
+type actionHandler struct {
+	path       string
+	method     string
+	a          Action
+	app        app.Ctx
+	isDraining func() bool
+	add        func()
+	done       func()
+	callChain  CallFunc
+}
+
+func (h *actionHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	// Add to waitgroup
+	h.add()
+	defer h.done()
+
+	// Assign unique request ID
+	journey := journey.New(h.app)
+
+	// Build context
+	c := &Context{
+		Ctx:        journey,
+		Res:        rw,
+		Req:        r,
+		Params:     mux.Vars(r),
+		StartAt:    time.Now(),
+		isDraining: h.isDraining,
+		action:     h.a,
+	}
+
+	// Pick decoder
+	if hasBody(r.Method) {
+		c.Parser = PickParser(journey, r)
+	}
+
+	// Add request ID to response header (useful for debugging)
+	rw.Header().Add("X-Request-Id", journey.UUID())
+
+	// Start call chain
+	renderer := h.callChain(c)
+
+	// Encode response
+	err := renderer.Encode(c)
+	if err != nil {
+		journey.Error("Renderer error", err)
+		c.Res.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }

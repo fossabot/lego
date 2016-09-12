@@ -3,10 +3,8 @@ package http
 import (
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/stairlin/lego/ctx/app"
-	"github.com/stairlin/lego/ctx/journey"
 
 	"github.com/gorilla/mux"
 )
@@ -31,6 +29,10 @@ type Handler struct {
 
 	routes      []Route
 	middlewares []Middleware
+	static      struct {
+		Path string
+		Dir  string
+	}
 }
 
 // NewHandler creates a new metal handler
@@ -61,6 +63,13 @@ func (h *Handler) Append(m Middleware) {
 	h.middlewares = append(h.middlewares, m)
 }
 
+// Static registers a new route with path prefix to serve
+// static files from the provided root directory.
+func (h *Handler) Static(path, dir string) {
+	h.static.Path = path
+	h.static.Dir = dir
+}
+
 // Serve starts serving HTTP requests (blocking call)
 func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 	// Print out middlewares and routes
@@ -72,7 +81,7 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 	for _, route := range h.routes {
 		chain := buildMiddlewareChain(h.middlewares, route.Action)
 
-		h := &handler{
+		h := &actionHandler{
 			path:       route.Path,
 			method:     route.Method,
 			a:          route.Action,
@@ -84,6 +93,16 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 		}
 
 		r.Handle(route.Path, h).Methods(route.Method, OPTIONS)
+	}
+
+	// Map static directory (if any)
+	if h.static.Path != "" && h.static.Dir != "" {
+		ctx.Infof("h.http.static", "Mapping %s with %s", h.static.Path, h.static.Dir)
+		sh := &staticHandler{
+			App: ctx,
+			FS:  http.FileServer(http.Dir(h.static.Dir)),
+		}
+		r.PathPrefix(h.static.Path).Handler(http.StripPrefix(h.static.Path, sh))
 	}
 
 	ctx.Infof("h.http.listen", addr)
@@ -116,54 +135,4 @@ func (h *Handler) add() {
 // done signals the end of a request
 func (h *Handler) done() {
 	h.wg.Done()
-}
-
-type handler struct {
-	path       string
-	method     string
-	a          Action
-	app        app.Ctx
-	isDraining func() bool
-	add        func()
-	done       func()
-	callChain  CallFunc
-}
-
-func (h *handler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	// Add to waitgroup
-	h.add()
-	defer h.done()
-
-	// Assign unique request ID
-	journey := journey.New(h.app)
-
-	// Build context
-	c := &Context{
-		Ctx:        journey,
-		Res:        rw,
-		Req:        r,
-		Params:     mux.Vars(r),
-		StartAt:    time.Now(),
-		isDraining: h.isDraining,
-		action:     h.a,
-	}
-
-	// Pick decoder
-	if hasBody(r.Method) {
-		c.Parser = PickParser(journey, r)
-	}
-
-	// Add request ID to response header (useful for debugging)
-	rw.Header().Add("X-Request-Id", journey.UUID())
-
-	// Start call chain
-	renderer := h.callChain(c)
-
-	// Encode response
-	err := renderer.Encode(c)
-	if err != nil {
-		journey.Error("Renderer error", err)
-		c.Res.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 }
