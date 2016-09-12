@@ -1,7 +1,7 @@
 # lego
 
 ```shell
-    CONFIG_URI=file://${PWD}/config/dev.json go run main.go
+CONFIG_URI=file://${PWD}/config/dev.json go run main.go
 ```
 
 ## Setup
