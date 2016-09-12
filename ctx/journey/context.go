@@ -12,13 +12,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/satori/go.uuid"
 	"github.com/stairlin/lego/bg"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx"
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/stats"
-	"github.com/satori/go.uuid"
 )
 
 // Ctx is the journey context interface
@@ -75,24 +75,14 @@ func (c *context) ShortID() string {
 	return strings.Split(c.ID, "-")[0]
 }
 
-func (c *context) Debug(tag string, args ...interface{}) {
+func (c *context) Trace(tag string, args ...interface{}) {
 	c.incTag(tag)
-	c.log().Info(buildLogLine(c.logPrefix(), tag, spaceOut(args...)))
+	c.log().Trace(buildLogLine(c.logPrefix(), tag, spaceOut(args...)))
 }
 
-func (c *context) Debugf(tag string, format string, args ...interface{}) {
+func (c *context) Tracef(tag string, format string, args ...interface{}) {
 	c.incTag(tag)
-	c.log().Info(buildLogLine(c.logPrefix(), tag, fmt.Sprintf(format, args...)))
-}
-
-func (c *context) Info(tag string, args ...interface{}) {
-	c.incTag(tag)
-	c.log().Info(buildLogLine(c.logPrefix(), tag, spaceOut(args...)))
-}
-
-func (c *context) Infof(tag string, format string, args ...interface{}) {
-	c.incTag(tag)
-	c.log().Info(buildLogLine(c.logPrefix(), tag, fmt.Sprintf(format, args...)))
+	c.log().Trace(buildLogLine(c.logPrefix(), tag, fmt.Sprintf(format, args...)))
 }
 
 func (c *context) Warning(args ...interface{}) {

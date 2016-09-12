@@ -6,8 +6,6 @@ type Level int
 const (
 	// LevelTrace displays logs with trace level (and above)
 	LevelTrace Level = iota
-	// LevelInfo displays logs with info level (and above)
-	LevelInfo
 	// LevelWarning displays logs with warning level (and above)
 	LevelWarning
 	// LevelError displays only logs with error level
@@ -16,9 +14,9 @@ const (
 
 // Logger is an interface for app loggers
 type Logger interface {
-	Info(args ...interface{})
-	Infoln(args ...interface{})
-	Infof(format string, args ...interface{})
+	Trace(args ...interface{})
+	Traceln(args ...interface{})
+	Tracef(format string, args ...interface{})
 	Warning(args ...interface{})
 	Warningln(args ...interface{})
 	Warningf(format string, args ...interface{})

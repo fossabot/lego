@@ -10,10 +10,8 @@ type Ctx interface {
 
 // Logger provides the core interface for logging
 type Logger interface {
-	Debug(tag string, args ...interface{})
-	Debugf(tag string, format string, args ...interface{})
-	Info(tag string, args ...interface{})
-	Infof(tag string, format string, args ...interface{})
+	Trace(tag string, args ...interface{})
+	Tracef(tag string, format string, args ...interface{})
 	Warning(args ...interface{})
 	Warningf(format string, args ...interface{})
 	Error(args ...interface{})

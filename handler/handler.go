@@ -57,7 +57,7 @@ func (r *Reg) Serve() error {
 		return ErrEmptyReg
 	}
 
-	r.ctx.Info("handler.serve.init", "Starting handlers...")
+	r.ctx.Trace("handler.serve.init", "Starting handlers...")
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(r.l))
@@ -65,13 +65,13 @@ func (r *Reg) Serve() error {
 		go func(addr string, h H) {
 			// Deregister itself upon completion
 			defer func() {
-				r.ctx.Infof("lego.serve.h.stop", "Handler <addr:%s> <h:%T> has stopped running", addr, h)
+				r.ctx.Tracef("lego.serve.h.stop", "Handler <addr:%s> <h:%T> has stopped running", addr, h)
 				r.mu.Lock()
 				r.deregister(addr)
 				r.mu.Unlock()
 			}()
 
-			r.ctx.Infof("lego.serve.h", "<addr:%s> <h:%T>", addr, h)
+			r.ctx.Tracef("lego.serve.h", "<addr:%s> <h:%T>", addr, h)
 			wg.Done()
 			err := h.Serve(addr, r.ctx)
 			if err != nil {
@@ -81,7 +81,7 @@ func (r *Reg) Serve() error {
 	}
 
 	wg.Wait() // Wait to boot all handlers
-	r.ctx.Infof("handler.serve.ready", "All handlers are running")
+	r.ctx.Tracef("handler.serve.ready", "All handlers are running")
 
 	return nil
 }
@@ -106,9 +106,9 @@ func (r *Reg) Drain() {
 	wg.Add(l)
 
 	// Drain handlers
-	r.ctx.Infof("handler.drain.init", "Start draining... <%d>", l)
+	r.ctx.Tracef("handler.drain.init", "Start draining... <%d>", l)
 	for _, h := range r.l {
-		r.ctx.Infof("handler.drain.h", "%T", h)
+		r.ctx.Tracef("handler.drain.h", "%T", h)
 		go func(h H) {
 			h.Drain()
 			wg.Done()
@@ -118,7 +118,7 @@ func (r *Reg) Drain() {
 	wg.Wait()
 
 	r.drain = false
-	r.ctx.Infof("handler.drain.done", "All handlers have been drained")
+	r.ctx.Tracef("handler.drain.done", "All handlers have been drained")
 }
 
 func (r *Reg) register(addr string, h H) error {

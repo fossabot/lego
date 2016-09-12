@@ -27,7 +27,7 @@ func buildMiddlewareChain(l []Middleware, a Action) CallFunc {
 // mwDraining blocks request when the handler is draining
 func mwDraining(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
-		c.Ctx.Debug("http.mw.draining.call")
+		c.Ctx.Trace("http.mw.draining.call")
 		if c.isDraining() {
 			return c.Head(http.StatusServiceUnavailable)
 		}
@@ -38,14 +38,14 @@ func mwDraining(next CallFunc) CallFunc {
 // mwDraining blocks request when the handler is draining
 func mwLogging(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
-		c.Ctx.Debug("http.mw.logging.call")
+		c.Ctx.Trace("http.mw.logging.call")
 
-		c.Ctx.Infof("h.http.req.start", "%s %T", c.Req.Method, c.Req.URL)
-		c.Ctx.Info("h.http.req.ua", c.Req.Header.Get("User-Agent"))
+		c.Ctx.Tracef("h.http.req.start", "%s %T", c.Req.Method, c.Req.URL)
+		c.Ctx.Trace("h.http.req.ua", c.Req.Header.Get("User-Agent"))
 
 		r := next(c)
 
-		c.Ctx.Infof("h.http.req.end", "status=<%v> duration=<%v>", r.Status(), time.Since(c.StartAt))
+		c.Ctx.Tracef("h.http.req.end", "status=<%v> duration=<%v>", r.Status(), time.Since(c.StartAt))
 
 		return r
 	}
@@ -54,7 +54,7 @@ func mwLogging(next CallFunc) CallFunc {
 // mwStats sends request/response stats
 func mwStats(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
-		c.Ctx.Debug("http.mw.stats.call")
+		c.Ctx.Trace("http.mw.stats.call")
 
 		r := next(c)
 
@@ -78,7 +78,7 @@ func mwStats(next CallFunc) CallFunc {
 
 func mwPanic(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
-		c.Ctx.Debug("http.mw.panic.call")
+		c.Ctx.Trace("http.mw.panic.call")
 
 		p := false
 		var r Renderer

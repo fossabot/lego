@@ -70,20 +70,12 @@ func (c *context) BG() *bg.Reg {
 	return c.BGReg
 }
 
-func (c *context) Debug(tag string, args ...interface{}) {
-	c.l.Info(spaceOut(c.logPrefix(), tag, spaceOut(args...)))
+func (c *context) Trace(tag string, args ...interface{}) {
+	c.l.Trace(spaceOut(c.logPrefix(), tag, spaceOut(args...)))
 }
 
-func (c *context) Debugf(tag string, format string, args ...interface{}) {
-	c.l.Info(spaceOut(c.logPrefix(), tag, fmt.Sprintf(format, args...)))
-}
-
-func (c *context) Info(tag string, args ...interface{}) {
-	c.l.Info(spaceOut(c.logPrefix(), tag, spaceOut(args...)))
-}
-
-func (c *context) Infof(tag string, format string, args ...interface{}) {
-	c.l.Info(spaceOut(c.logPrefix(), tag, fmt.Sprintf(format, args...)))
+func (c *context) Tracef(tag string, format string, args ...interface{}) {
+	c.l.Trace(spaceOut(c.logPrefix(), tag, fmt.Sprintf(format, args...)))
 }
 
 func (c *context) Warning(args ...interface{}) {

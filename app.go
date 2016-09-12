@@ -88,7 +88,7 @@ func (a *App) Config() *config.Config {
 
 // Serve allows handlers to serve requests and blocks the call
 func (a *App) Serve() error {
-	a.ctx.Infof("lego.serve", "start serving...")
+	a.ctx.Tracef("lego.serve", "start serving...")
 
 	err := a.handlers.Serve()
 	if err != nil {
@@ -111,7 +111,7 @@ func (a *App) Ready() {
 // Drain notify all handlers to enter in draining mode. It means they are no
 // longer accepting new requests, but they can finish all in-flight requests
 func (a *App) Drain() {
-	a.ctx.Infof("lego.drain", "start draining...")
+	a.ctx.Tracef("lego.drain", "start draining...")
 
 	// Check if we are already stopping
 	a.mu.Lock()
@@ -139,7 +139,7 @@ func trapSignals(app *App) {
 
 	for {
 		sig := <-ch
-		app.Ctx().Infof("lego.signal", "trapped <%s>", sig)
+		app.Ctx().Tracef("lego.signal", "trapped <%s>", sig)
 
 		switch sig {
 		case syscall.SIGINT, syscall.SIGTERM:

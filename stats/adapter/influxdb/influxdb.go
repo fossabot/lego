@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	influx "github.com/influxdata/influxdb/client/v2"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/stats"
-	influx "github.com/influxdata/influxdb/client/v2"
 )
 
 // Name contains the adapter registered name
@@ -83,7 +83,7 @@ func (s *InfluxDB) Add(metric *stats.Metric) {
 }
 
 func (s *InfluxDB) Start() {
-	s.logger.Infof("stats influxdb: connecting to <%s>", s.url)
+	s.logger.Tracef("stats influxdb: connecting to <%s>", s.url)
 
 	tick := time.Tick(5 * time.Second)
 	for {
@@ -116,7 +116,7 @@ func (s *InfluxDB) Start() {
 func (s *InfluxDB) Stop() {
 	s.done <- true
 	s.client.Close()
-	s.logger.Info("Stopping InfluxDB stats client")
+	s.logger.Trace("Stopping InfluxDB stats client")
 }
 
 func (s *InfluxDB) buildBatch() (influx.BatchPoints, error) {

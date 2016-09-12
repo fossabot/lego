@@ -11,10 +11,10 @@ func TestLogger(t *testing.T) {
 	app := tt.NewAppCtx("journey-test")
 
 	// Send a few log lines
-	app.Debug("j.test.debug", "A debug line")
-	app.Debugf("j.test.debug", "A %s debug line", "formatted")
-	app.Info("j.test.info", "A info line")
-	app.Infof("j.test.info", "A %s info line", "formatted")
+	app.Trace("j.test.trace", "A trace line")
+	app.Tracef("j.test.trace", "A %s trace line", "formatted")
+	app.Tracef("j.test.trace2", "Another %s trace line", "formatted")
+	app.Tracef("j.test.trace3", "Yet another %s trace line", "formatted")
 	app.Warning("A warning line")
 	app.Warning("Another warning line")
 	app.Warningf("A %s warning line", "formatted")
@@ -26,9 +26,9 @@ func TestLogger(t *testing.T) {
 		severity string
 		expected int
 	}{
-		{severity: lt.I, expected: 4},
-		{severity: lt.W, expected: 3},
-		{severity: lt.E, expected: 2},
+		{severity: lt.TC, expected: 4},
+		{severity: lt.WN, expected: 3},
+		{severity: lt.ER, expected: 2},
 	}
 
 	// Ensure they have been sent to the logger

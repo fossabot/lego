@@ -13,8 +13,7 @@ type StdLogger struct {
 }
 
 var (
-	traceColour   = color.New(color.FgCyan)
-	infoColour    = color.New(color.FgBlue)
+	traceColour   = color.New(color.FgBlue)
 	warningColour = color.New(color.FgYellow)
 	errColour     = color.New(color.FgRed)
 )
@@ -24,8 +23,6 @@ func NewStdLogger(l string) (Logger, error) {
 	switch l {
 	case "trace":
 		return &StdLogger{L: LevelTrace}, nil
-	case "info":
-		return &StdLogger{L: LevelInfo}, nil
 	case "warning":
 		return &StdLogger{L: LevelWarning}, nil
 	case "error":
@@ -35,21 +32,21 @@ func NewStdLogger(l string) (Logger, error) {
 	return nil, fmt.Errorf("unknown level <%s>", l)
 }
 
-func (l *StdLogger) Info(args ...interface{}) {
-	if l.L <= LevelInfo {
-		glog.Info(infoColour.SprintFunc()(args...))
+func (l *StdLogger) Trace(args ...interface{}) {
+	if l.L <= LevelTrace {
+		glog.Info(traceColour.SprintFunc()(args...))
 	}
 }
 
-func (l *StdLogger) Infoln(args ...interface{}) {
-	if l.L <= LevelInfo {
-		glog.Info(infoColour.SprintFunc()(args...))
+func (l *StdLogger) Traceln(args ...interface{}) {
+	if l.L <= LevelTrace {
+		glog.Info(traceColour.SprintFunc()(args...))
 	}
 }
 
-func (l *StdLogger) Infof(format string, args ...interface{}) {
-	if l.L <= LevelInfo {
-		glog.Info(infoColour.SprintfFunc()(format, args...))
+func (l *StdLogger) Tracef(format string, args ...interface{}) {
+	if l.L <= LevelTrace {
+		glog.Info(traceColour.SprintfFunc()(format, args...))
 	}
 }
 

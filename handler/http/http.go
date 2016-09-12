@@ -73,8 +73,8 @@ func (h *Handler) Static(path, dir string) {
 // Serve starts serving HTTP requests (blocking call)
 func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 	// Print out middlewares and routes
-	ctx.Infof("h.http.middlewares", "%d", len(h.middlewares))
-	ctx.Infof("h.http.routes", "\n%s", table(h.routes))
+	ctx.Tracef("h.http.middlewares", "%d", len(h.middlewares))
+	ctx.Tracef("h.http.routes", "\n%s", table(h.routes))
 
 	// Map actions
 	r := mux.NewRouter()
@@ -97,7 +97,7 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 
 	// Map static directory (if any)
 	if h.static.Path != "" && h.static.Dir != "" {
-		ctx.Infof("h.http.static", "Mapping %s with %s", h.static.Path, h.static.Dir)
+		ctx.Tracef("h.http.static", "Mapping %s with %s", h.static.Path, h.static.Dir)
 		sh := &staticHandler{
 			App: ctx,
 			FS:  http.FileServer(http.Dir(h.static.Dir)),
@@ -105,7 +105,7 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 		r.PathPrefix(h.static.Path).Handler(http.StripPrefix(h.static.Path, sh))
 	}
 
-	ctx.Infof("h.http.listen", addr)
+	ctx.Tracef("h.http.listen", addr)
 	return http.ListenAndServe(addr, r)
 }
 

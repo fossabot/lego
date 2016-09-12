@@ -30,11 +30,11 @@ func PickParser(ctx journey.Ctx, req *http.Request) Parser {
 
 	switch m {
 	case mimeJSON:
-		ctx.Info("action.parser.json")
+		ctx.Trace("action.parser.json")
 		return &ParseJSON{req}
 	}
 
-	ctx.Info("action.parser.null")
+	ctx.Trace("action.parser.null")
 	return &ParseNull{m}
 }
 

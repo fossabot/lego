@@ -9,12 +9,12 @@ import (
 )
 
 const (
-	// I is the INFO log constant
-	I = "INFO"
+	// T is the TRACE log constant
+	TC = "TRACE"
 	// W is the WARNING log constant
-	W = "WARN"
+	WN = "WARN"
 	// E is the ERROR log constant
-	E = "ERRR"
+	ER = "ERRR"
 )
 
 // Logger is a simple Logger interface useful for tests
@@ -56,12 +56,12 @@ func (l *Logger) Lines(s string) int {
 	return l.lines[s]
 }
 
-func (l *Logger) Info(args ...interface{})               { l.l(I, args...) }
-func (l *Logger) Infoln(args ...interface{})             { l.l(I, args...) }
-func (l *Logger) Infof(f string, args ...interface{})    { l.lf(I, f, args...) }
-func (l *Logger) Warning(args ...interface{})            { l.l(W, args...) }
-func (l *Logger) Warningln(args ...interface{})          { l.l(W, args...) }
-func (l *Logger) Warningf(f string, args ...interface{}) { l.lf(W, f, args...) }
-func (l *Logger) Error(args ...interface{})              { l.l(E, args...) }
-func (l *Logger) Errorln(args ...interface{})            { l.l(E, args...) }
-func (l *Logger) Errorf(f string, args ...interface{})   { l.lf(E, f, args...) }
+func (l *Logger) Trace(args ...interface{})              { l.l(TC, args...) }
+func (l *Logger) Traceln(args ...interface{})            { l.l(TC, args...) }
+func (l *Logger) Tracef(f string, args ...interface{})   { l.lf(TC, f, args...) }
+func (l *Logger) Warning(args ...interface{})            { l.l(WN, args...) }
+func (l *Logger) Warningln(args ...interface{})          { l.l(WN, args...) }
+func (l *Logger) Warningf(f string, args ...interface{}) { l.lf(WN, f, args...) }
+func (l *Logger) Error(args ...interface{})              { l.l(ER, args...) }
+func (l *Logger) Errorln(args ...interface{})            { l.l(ER, args...) }
+func (l *Logger) Errorf(f string, args ...interface{})   { l.lf(ER, f, args...) }

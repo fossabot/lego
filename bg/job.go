@@ -64,7 +64,7 @@ func (r *Reg) Dispatch(j Job) error {
 		}()
 
 		// Start job
-		r.log.Infof("Start job <j:%T> <addr:%p>", j, j)
+		r.log.Tracef("Start job <j:%T> <addr:%p>", j, j)
 		s.started <- struct{}{}
 		j.Start()
 	}()
@@ -90,7 +90,7 @@ func (r *Reg) Drain() {
 	r.mu.Unlock()
 
 	// Start draining jobs
-	r.log.Infof("Draining registry (%d jobs)...", len(r.jobs))
+	r.log.Tracef("Draining registry (%d jobs)...", len(r.jobs))
 	for j, s := range r.jobs {
 		go func(j Job, s *status) {
 			defer wg.Done()
@@ -99,13 +99,13 @@ func (r *Reg) Drain() {
 			<-s.started
 
 			// Stop job
-			r.log.Infof("Stop job <j:%T> <addr:%p>", j, j)
+			r.log.Tracef("Stop job <j:%T> <addr:%p>", j, j)
 			j.Stop()
 		}(j, s)
 	}
 
 	wg.Wait()
-	r.log.Info("Registry drained")
+	r.log.Trace("Registry drained")
 }
 
 func (r *Reg) register(j Job) *status {

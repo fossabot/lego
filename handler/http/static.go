@@ -14,15 +14,15 @@ type staticHandler struct {
 
 func (h *staticHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	j := journey.New(h.App)
-	j.Debugf("h.http.static.inbound", "File: <%s>", r.URL)
-	j.Debugf("h.http.static.cache", "If-Modified-Since: <%s>", r.Header.Get("If-Modified-Since"))
+	j.Tracef("h.http.static.inbound", "File: <%s>", r.URL)
+	j.Tracef("h.http.static.cache", "If-Modified-Since: <%s>", r.Header.Get("If-Modified-Since"))
 
 	// Wrap response writer to get the status code
 	res := &responseWriter{ResponseWriter: rw, status: http.StatusOK}
 
 	h.FS.ServeHTTP(res, r)
 
-	j.Debugf("h.http.static.res", "Status: <%d>", res.status)
+	j.Tracef("h.http.static.res", "Status: <%d>", res.status)
 }
 
 type responseWriter struct {
