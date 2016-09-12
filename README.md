@@ -1,7 +1,7 @@
 # lego
 
 ```shell
-CONFIG_URI=file://${PWD}/config/dev.json go run main.go
+CONFIG_URI=file://${PWD}/config/dev.json go run main.go -logtostderr
 ```
 
 ## Setup
@@ -12,11 +12,17 @@ Basic setup
 package main
 
 import (
+	"flag"
+	"fmt"
+	"os"
+
     "github.com/stairlin/lego"
     "github.com/stairlin/lego/handler/http"
 )
 
 func main() {
+    flag.Parse()
+
     // Create lego
     app, err := lego.New("api", nil)
     if err != nil {
@@ -27,7 +33,7 @@ func main() {
     // Register HTTP handler
     h := http.NewHandler()
     h.Handle("/ping", http.GET, &Ping{})
-    app.RegisterHandler(":3000", h)
+    app.RegisterHandler("127.0.0.1:3000", h)
 
     // Start serving requests
     err = app.Serve()
