@@ -9,7 +9,7 @@ import (
 
 type staticHandler struct {
 	App app.Ctx
-	FS  http.Handler
+	FS  *fileHandler
 }
 
 func (h *staticHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {

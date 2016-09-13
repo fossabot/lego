@@ -100,7 +100,7 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 		ctx.Tracef("h.http.static", "Mapping %s with %s", h.static.Path, h.static.Dir)
 		sh := &staticHandler{
 			App: ctx,
-			FS:  http.FileServer(http.Dir(h.static.Dir)),
+			FS:  &fileHandler{root: http.Dir(h.static.Dir)},
 		}
 		r.PathPrefix(h.static.Path).Handler(http.StripPrefix(h.static.Path, sh))
 	}
