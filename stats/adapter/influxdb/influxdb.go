@@ -37,7 +37,17 @@ type Config struct {
 
 func New(c map[string]string) (stats.Stats, error) {
 	// Make client
-	url := config.ValueOf(c["url"])
+	var url string
+	if c["url"] != "" {
+		url = config.ValueOf(c["url"])
+	} else {
+		url = fmt.Sprintf("%s://%s:%s",
+			config.ValueOf(c["proto"]),
+			config.ValueOf(c["addr"]),
+			config.ValueOf(c["port"]),
+		)
+	}
+
 	client, err := influx.NewHTTPClient(influx.HTTPConfig{
 		Addr:     url,
 		Username: c["username"],
