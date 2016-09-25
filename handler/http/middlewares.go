@@ -63,7 +63,7 @@ func mwStats(next CallFunc) CallFunc {
 		r := next(c)
 
 		tags["status"] = fmt.Sprintf("%v", r.Status())
-		c.Ctx.Stats().Inc("http.call", tags)
+		c.Ctx.Stats().Histogram("http.call", 1, tags)
 		c.Ctx.Stats().Timing("http.time", time.Since(c.StartAt), tags)
 		c.Ctx.Stats().Dec("http.conc", tags)
 

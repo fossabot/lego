@@ -16,6 +16,7 @@ type Stats interface {
 	Dec(key string, meta ...map[string]string)
 	Gauge(key string, n interface{}, meta ...map[string]string)
 	Timing(key string, t time.Duration, meta ...map[string]string)
+	Histogram(key string, n interface{}, tags ...map[string]string)
 
 	SetLogger(l log.Logger)
 }

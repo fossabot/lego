@@ -116,7 +116,7 @@ func (c *context) incTag(tag string) {
 		"tag": tag,
 	}
 
-	c.stats().Inc("log", tags)
+	c.stats().Histogram("log", 1, tags)
 }
 
 func (c *context) l() log.Logger {

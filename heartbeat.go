@@ -22,7 +22,7 @@ func (h *hearbeat) Start() {
 				"type": h.app.Ctx().Name(),
 			}
 
-			h.app.Ctx().Stats().Inc("heartbeat", tags)
+			h.app.Ctx().Stats().Histogram("heartbeat", 1, tags)
 		}
 	}
 }

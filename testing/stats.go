@@ -18,12 +18,13 @@ func NewStats(t *testing.T) stats.Stats {
 	return &Stats{t: t}
 }
 
-func (s *Stats) Start()                                                        {}
-func (s *Stats) Stop()                                                         {}
-func (s *Stats) Add(metric *stats.Metric)                                      {}
-func (s *Stats) SetLogger(l log.Logger)                                        {}
-func (s *Stats) Count(key string, n interface{}, meta ...map[string]string)    {}
-func (s *Stats) Inc(key string, meta ...map[string]string)                     {}
-func (s *Stats) Dec(key string, meta ...map[string]string)                     {}
-func (s *Stats) Gauge(key string, n interface{}, meta ...map[string]string)    {}
-func (s *Stats) Timing(key string, d time.Duration, meta ...map[string]string) {}
+func (s *Stats) Start()                                                         {}
+func (s *Stats) Stop()                                                          {}
+func (s *Stats) Add(metric *stats.Metric)                                       {}
+func (s *Stats) SetLogger(l log.Logger)                                         {}
+func (s *Stats) Count(key string, n interface{}, meta ...map[string]string)     {}
+func (s *Stats) Inc(key string, meta ...map[string]string)                      {}
+func (s *Stats) Dec(key string, meta ...map[string]string)                      {}
+func (s *Stats) Gauge(key string, n interface{}, meta ...map[string]string)     {}
+func (s *Stats) Timing(key string, d time.Duration, meta ...map[string]string)  {}
+func (s *Stats) Histogram(key string, n interface{}, tags ...map[string]string) {}
