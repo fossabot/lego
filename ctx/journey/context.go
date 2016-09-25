@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/satori/go.uuid"
 	"github.com/stairlin/lego/bg"
@@ -113,17 +112,11 @@ func (c *context) logPrefix() string {
 }
 
 func (c *context) incTag(tag string) {
-	metric := stats.Metric{
-		Key: "log",
-		Values: map[string]interface{}{
-			"value": 1,
-		},
-		T: time.Now(),
-		Meta: map[string]string{
-			"tag": tag,
-		},
+	tags := map[string]string{
+		"tag": tag,
 	}
-	c.stats().Add(&metric)
+
+	c.stats().Inc("log", tags)
 }
 
 func (c *context) l() log.Logger {

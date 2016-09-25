@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/stats"
-	"github.com/stairlin/lego/stats/adapter/influxdb"
+	"github.com/stairlin/lego/stats/adapter/statsd"
 )
 
 func init() {
-	Register(influxdb.Name, influxdb.New)
+	Register(statsd.Name, statsd.New)
 }
 
 // Adapter returns a new store initialised with the given config
@@ -21,10 +22,14 @@ type Adapter func(config map[string]string) (stats.Stats, error)
 // Void is a null stats adapter
 type Void struct{}
 
-func (s *Void) Start()                   {}
-func (s *Void) Stop()                    {}
-func (s *Void) Add(metric *stats.Metric) {}
-func (s *Void) SetLogger(l log.Logger)   {}
+func (s *Void) Start()                                                        {}
+func (s *Void) Stop()                                                         {}
+func (s *Void) SetLogger(l log.Logger)                                        {}
+func (s *Void) Count(key string, n interface{}, meta ...map[string]string)    {}
+func (s *Void) Inc(key string, meta ...map[string]string)                     {}
+func (s *Void) Dec(key string, meta ...map[string]string)                     {}
+func (s *Void) Gauge(key string, n interface{}, meta ...map[string]string)    {}
+func (s *Void) Timing(key string, t time.Duration, meta ...map[string]string) {}
 
 func New(config *config.Stats) (stats.Stats, error) {
 	if !config.On {

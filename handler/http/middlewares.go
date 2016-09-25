@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	"github.com/stairlin/lego/stats"
 )
 
 // Middleware is a function called on the HTTP stack before an action
@@ -56,21 +54,18 @@ func mwStats(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
 		c.Ctx.Trace("http.mw.stats.call")
 
+		tags := map[string]string{
+			"action": fmt.Sprintf("%T", c.action),
+		}
+		c.Ctx.Stats().Inc("http.conc", tags)
+
+		// Next middleware
 		r := next(c)
 
-		// Stats
-		metric := stats.Metric{
-			Key: "http",
-			Values: map[string]interface{}{
-				"duration": time.Since(c.StartAt).Nanoseconds() / 1000, // us
-			},
-			T: time.Now(),
-			Meta: map[string]string{
-				"action": fmt.Sprintf("%T", c.action),
-				"status": fmt.Sprintf("%v", r.Status()),
-			},
-		}
-		c.Ctx.Stats().Add(&metric)
+		tags["status"] = fmt.Sprintf("%v", r.Status())
+		c.Ctx.Stats().Inc("http.call", tags)
+		c.Ctx.Stats().Timing("http.time", time.Since(c.StartAt), tags)
+		c.Ctx.Stats().Dec("http.conc", tags)
 
 		return r
 	}

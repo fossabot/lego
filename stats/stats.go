@@ -10,7 +10,12 @@ import (
 type Stats interface {
 	Start()
 	Stop()
-	Add(metric *Metric)
+
+	Count(key string, n interface{}, meta ...map[string]string)
+	Inc(key string, meta ...map[string]string)
+	Dec(key string, meta ...map[string]string)
+	Gauge(key string, n interface{}, meta ...map[string]string)
+	Timing(key string, t time.Duration, meta ...map[string]string)
 
 	SetLogger(l log.Logger)
 }

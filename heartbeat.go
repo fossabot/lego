@@ -1,10 +1,6 @@
 package lego
 
-import (
-	"time"
-
-	"github.com/stairlin/lego/stats"
-)
+import "time"
 
 // heartbeat sends a heartbeat to stats periodically
 type hearbeat struct {
@@ -22,17 +18,11 @@ func (h *hearbeat) Start() {
 		case <-h.stop:
 			break
 		case <-tick:
-			metric := stats.Metric{
-				Key: "heartbeat",
-				Values: map[string]interface{}{
-					"value": 1,
-				},
-				T: time.Now(),
-				Meta: map[string]string{
-					"type": h.app.Ctx().Name(),
-				},
+			tags := map[string]string{
+				"type": h.app.Ctx().Name(),
 			}
-			h.app.Ctx().Stats().Add(&metric)
+
+			h.app.Ctx().Stats().Inc("heartbeat", tags)
 		}
 	}
 }
