@@ -64,11 +64,11 @@ func (c *Client) Count(key string, n interface{}, tags ...map[string]string) {
 }
 
 func (c *Client) Inc(key string, tags ...map[string]string) {
-	c.Count(key, 1)
+	c.Count(key, 1, tags...)
 }
 
 func (c *Client) Dec(key string, tags ...map[string]string) {
-	c.Count(key, -1)
+	c.Count(key, -1, tags...)
 }
 
 func (c *Client) Gauge(key string, n interface{}, tags ...map[string]string) {
