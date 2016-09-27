@@ -20,7 +20,6 @@ func NewStats(t *testing.T) stats.Stats {
 
 func (s *Stats) Start()                                                         {}
 func (s *Stats) Stop()                                                          {}
-func (s *Stats) Add(metric *stats.Metric)                                       {}
 func (s *Stats) SetLogger(l log.Logger)                                         {}
 func (s *Stats) Count(key string, n interface{}, meta ...map[string]string)     {}
 func (s *Stats) Inc(key string, meta ...map[string]string)                      {}

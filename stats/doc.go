@@ -1,2 +1,2 @@
 // Package stats provides functions for reporting metrics to a service.
-package log
+package stats
