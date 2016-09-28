@@ -1,7 +1,7 @@
 package testing
 
 import (
-	"fmt"
+	"bytes"
 	"sync"
 	"testing"
 
@@ -22,24 +22,22 @@ type Logger struct {
 	mu sync.RWMutex
 	t  *testing.T
 
-	lines map[string]int
+	calldepth int
+	lines     map[string]int
+	fields    []log.Field
 }
 
 // NewLogger creates a new logger
 func NewLogger(t *testing.T) log.Logger {
 	return &Logger{
-		t:     t,
-		lines: map[string]int{},
+		t:         t,
+		calldepth: 1,
+		lines:     map[string]int{},
 	}
 }
 
-func (l *Logger) l(s string, args ...interface{}) {
-	l.t.Log(s, fmt.Sprint(args...))
-	l.inc(s)
-}
-
-func (l *Logger) lf(s, format string, args ...interface{}) {
-	l.t.Log(s, fmt.Sprintf(format, args...))
+func (l *Logger) l(s, tag, msg string, args ...log.Field) {
+	l.t.Log(s, format(tag, msg, args...))
 	l.inc(s)
 }
 
@@ -56,12 +54,34 @@ func (l *Logger) Lines(s string) int {
 	return l.lines[s]
 }
 
-func (l *Logger) Trace(args ...interface{})              { l.l(TC, args...) }
-func (l *Logger) Traceln(args ...interface{})            { l.l(TC, args...) }
-func (l *Logger) Tracef(f string, args ...interface{})   { l.lf(TC, f, args...) }
-func (l *Logger) Warning(args ...interface{})            { l.l(WN, args...) }
-func (l *Logger) Warningln(args ...interface{})          { l.l(WN, args...) }
-func (l *Logger) Warningf(f string, args ...interface{}) { l.lf(WN, f, args...) }
-func (l *Logger) Error(args ...interface{})              { l.l(ER, args...) }
-func (l *Logger) Errorln(args ...interface{})            { l.l(ER, args...) }
-func (l *Logger) Errorf(f string, args ...interface{})   { l.lf(ER, f, args...) }
+func (l *Logger) Trace(tag, msg string, fields ...log.Field)   { l.l(TC, tag, msg, fields...) }
+func (l *Logger) Warning(tag, msg string, fields ...log.Field) { l.l(WN, tag, msg, fields...) }
+func (l *Logger) Error(tag, msg string, fields ...log.Field)   { l.l(ER, tag, msg, fields...) }
+func (l *Logger) With(fields ...log.Field) log.Logger {
+	nl := NewLogger(l.t).(*Logger)
+	nl.fields = append(l.fields, fields...)
+	return nl
+}
+func (l *Logger) AddCalldepth(n int) log.Logger {
+	nl := NewLogger(l.t).(*Logger)
+	nl.calldepth = nl.calldepth + n
+	return nl
+}
+
+func format(tag, msg string, fields ...log.Field) string {
+	var b bytes.Buffer
+
+	b.WriteString(tag)
+	b.WriteString(" ")
+	b.WriteString(msg)
+	b.WriteString(" ")
+
+	for _, f := range fields {
+		k, v := f.KV()
+		b.WriteString(k)
+		b.WriteString("=")
+		b.WriteString(v)
+		b.WriteString(" ")
+	}
+	return b.String()
+}

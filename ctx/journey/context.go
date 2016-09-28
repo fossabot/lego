@@ -34,18 +34,25 @@ type Ctx interface {
 type context struct {
 	mu sync.Mutex
 
-	ID   string // (hopefuly) globally unique identifier
-	Step uint
-	app  app.Ctx
+	ID     string // (hopefuly) globally unique identifier
+	Step   uint
+	app    app.Ctx
+	logger log.Logger
 }
 
 // New creates a new context and returns it
 func New(ctx app.Ctx) Ctx {
 	id := uuid.NewV4().String()
 
+	// Log to correlate this journey with the current app environment
+	ctx.Trace("ctx.journey.new", "Start journey",
+		log.String("id", id),
+	)
+
 	return &context{
-		ID:  id,
-		app: ctx,
+		ID:     id,
+		app:    ctx,
+		logger: ctx.L(),
 	}
 }
 
@@ -74,41 +81,36 @@ func (c *context) ShortID() string {
 	return strings.Split(c.ID, "-")[0]
 }
 
-func (c *context) Trace(tag string, args ...interface{}) {
+func (c *context) Trace(tag, msg string, fields ...log.Field) {
 	c.incTag(tag)
-	c.log().Trace(buildLogLine(c.logPrefix(), tag, spaceOut(args...)))
+	c.log().Trace(tag, msg, c.logFields(fields)...)
 }
 
-func (c *context) Tracef(tag string, format string, args ...interface{}) {
+func (c *context) Warning(tag, msg string, fields ...log.Field) {
 	c.incTag(tag)
-	c.log().Trace(buildLogLine(c.logPrefix(), tag, fmt.Sprintf(format, args...)))
+	c.log().Warning(tag, msg, c.logFields(fields)...)
 }
 
-func (c *context) Warning(args ...interface{}) {
-	c.log().Warning(buildLogLine(c.logPrefix(), spaceOut(args...)))
+func (c *context) Error(tag, msg string, fields ...log.Field) {
+	c.incTag(tag)
+	c.log().Error(tag, msg, c.logFields(fields)...)
 }
 
-func (c *context) Warningf(format string, args ...interface{}) {
-	c.log().Warning(buildLogLine(c.logPrefix(), fmt.Sprintf(format, args...)))
-}
+func (c *context) logFields(fields []log.Field) []log.Field {
+	f := []log.Field{
+		log.String("log_type", "J"),
+		log.String("id", c.ShortID()),
+		log.Uint("step", c.Step),
+	}
 
-func (c *context) Error(args ...interface{}) {
-	c.log().Error(buildLogLine(c.logPrefix(), spaceOut(args...)))
-}
-
-func (c *context) Errorf(format string, args ...interface{}) {
-	c.log().Error(buildLogLine(c.logPrefix(), fmt.Sprintf(format, args...)))
+	return append(f, fields...)
 }
 
 func (c *context) log() log.Logger {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.Step++
-	return c.l()
-}
-
-func (c *context) logPrefix() string {
-	return fmt.Sprintf("J %s %s %04d", c.app.Name(), c.ShortID(), c.Step)
+	return c.logger
 }
 
 func (c *context) incTag(tag string) {
@@ -117,10 +119,6 @@ func (c *context) incTag(tag string) {
 	}
 
 	c.stats().Histogram("log", 1, tags)
-}
-
-func (c *context) l() log.Logger {
-	return c.app.L()
 }
 
 func (c *context) stats() stats.Stats {

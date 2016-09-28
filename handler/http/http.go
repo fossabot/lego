@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/log"
 
 	"github.com/gorilla/mux"
 )
@@ -72,10 +73,6 @@ func (h *Handler) Static(path, dir string) {
 
 // Serve starts serving HTTP requests (blocking call)
 func (h *Handler) Serve(addr string, ctx app.Ctx) error {
-	// Print out middlewares and routes
-	ctx.Tracef("h.http.middlewares", "%d", len(h.middlewares))
-	ctx.Tracef("h.http.routes", "\n%s", table(h.routes))
-
 	// Map actions
 	r := mux.NewRouter()
 	for _, route := range h.routes {
@@ -97,7 +94,11 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 
 	// Map static directory (if any)
 	if h.static.Path != "" && h.static.Dir != "" {
-		ctx.Tracef("h.http.static", "Mapping %s with %s", h.static.Path, h.static.Dir)
+		ctx.Trace("h.http.static", "Serving static files...",
+			log.String("path", h.static.Path),
+			log.String("dir", h.static.Dir),
+		)
+
 		sh := &staticHandler{
 			App: ctx,
 			FS:  &fileHandler{root: http.Dir(h.static.Dir)},
@@ -105,7 +106,9 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 		r.PathPrefix(h.static.Path).Handler(http.StripPrefix(h.static.Path, sh))
 	}
 
-	ctx.Tracef("h.http.listen", addr)
+	ctx.Trace("h.http.listen", "Listening...",
+		log.String("addr", addr),
+	)
 	return http.ListenAndServe(addr, r)
 }
 

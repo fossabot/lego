@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/stairlin/lego/log"
 )
 
 // Middleware is a function called on the HTTP stack before an action
@@ -25,8 +27,8 @@ func buildMiddlewareChain(l []Middleware, a Action) CallFunc {
 // mwDraining blocks request when the handler is draining
 func mwDraining(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
-		c.Ctx.Trace("http.mw.draining.call")
 		if c.isDraining() {
+			c.Ctx.Trace("http.mw.draining", "Service is draining")
 			return c.Head(http.StatusServiceUnavailable)
 		}
 		return next(c)
@@ -36,14 +38,18 @@ func mwDraining(next CallFunc) CallFunc {
 // mwDraining blocks request when the handler is draining
 func mwLogging(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
-		c.Ctx.Trace("http.mw.logging.call")
-
-		c.Ctx.Tracef("h.http.req.start", "%s %T", c.Req.Method, c.Req.URL)
-		c.Ctx.Trace("h.http.req.ua", c.Req.Header.Get("User-Agent"))
+		c.Ctx.Trace("h.http.req.start", "Request start",
+			log.String("method", c.Req.Method),
+			log.String("path", c.Req.URL.String()),
+			log.String("user_agent", c.Req.Header.Get("User-Agent")),
+		)
 
 		r := next(c)
 
-		c.Ctx.Tracef("h.http.req.end", "status=<%v> duration=<%v>", r.Status(), time.Since(c.StartAt))
+		c.Ctx.Trace("h.http.req.end", "Request end",
+			log.Int("status", r.Status()),
+			log.Duration("duration", time.Since(c.StartAt)),
+		)
 
 		return r
 	}
@@ -52,8 +58,6 @@ func mwLogging(next CallFunc) CallFunc {
 // mwStats sends request/response stats
 func mwStats(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
-		c.Ctx.Trace("http.mw.stats.call")
-
 		tags := map[string]string{
 			"action": fmt.Sprintf("%T", c.action),
 		}
@@ -73,8 +77,6 @@ func mwStats(next CallFunc) CallFunc {
 
 func mwPanic(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
-		c.Ctx.Trace("http.mw.panic.call")
-
 		p := false
 		var r Renderer
 
@@ -83,7 +85,9 @@ func mwPanic(next CallFunc) CallFunc {
 			defer func() {
 				if err := recover(); err != nil {
 					p = true
-					c.Ctx.Error("PANIC!", err)
+					c.Ctx.Error("http.mw.panic", "Recovered from panic",
+						log.Object("err", err),
+					)
 				}
 			}()
 

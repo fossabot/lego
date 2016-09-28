@@ -44,24 +44,24 @@ func TestLogger(t *testing.T) {
 	tt := lt.New(t)
 	app := tt.NewAppCtx("journey-test")
 	j := journey.New(app)
+	logger := app.L().(*lt.Logger)
 
 	// Send a few log lines
 	j.Trace("j.test.trace", "A trace line")
-	j.Tracef("j.test.trace", "A %s trace line", "formatted")
-	j.Tracef("j.test.trace2", "Another %s trace line", "formatted")
-	j.Tracef("j.test.trace3", "Yet another %s trace line", "formatted")
-	j.Warning("A warning line")
-	j.Warning("Another warning line")
-	j.Warningf("A %s warning line", "formatted")
-	j.Error("A error line")
-	j.Errorf("A %s error line", "formatted")
+	j.Trace("j.test.trace", "A second trace line")
+	j.Trace("j.test.trace", "A third trace line")
+	j.Trace("j.test.trace", "A fourth trace line")
+	j.Warning("j.test.warning", "A warning line")
+	j.Warning("j.test.warning", "Another warning line")
+	j.Warning("j.test.warning", "Yet another warning line")
+	j.Error("j.test.error", "An error line")
+	j.Error("j.test.error", "Another error line")
 
-	logger := tt.Logger().(*lt.Logger)
 	tests := []struct {
 		severity string
 		expected int
 	}{
-		{severity: lt.TC, expected: 4},
+		{severity: lt.TC, expected: 4 + 1},
 		{severity: lt.WN, expected: 3},
 		{severity: lt.ER, expected: 2},
 	}

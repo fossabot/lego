@@ -48,7 +48,9 @@ type Client struct {
 }
 
 func (c *Client) Start() {
-	c.logger.Tracef("statsd: connecting to <%s>...", c.conn.addr)
+	c.logger.Trace("stats.statsd.start", "opening connection...",
+		log.String("addr", c.conn.addr),
+	)
 }
 
 func (c *Client) Stop() {

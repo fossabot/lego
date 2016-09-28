@@ -5,6 +5,7 @@ import (
 
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"
+	"github.com/stairlin/lego/log"
 )
 
 type staticHandler struct {
@@ -14,15 +15,19 @@ type staticHandler struct {
 
 func (h *staticHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	j := journey.New(h.App)
-	j.Tracef("h.http.static.inbound", "File: <%s>", r.URL)
-	j.Tracef("h.http.static.cache", "If-Modified-Since: <%s>", r.Header.Get("If-Modified-Since"))
+	j.Trace("h.http.static.start", "Serve static file",
+		log.String("path", r.URL.String()),
+	)
+	j.Trace("h.http.static.cache", "Caching headers",
+		log.String("if_modified_since", r.Header.Get("If-Modified-Since")),
+	)
 
 	// Wrap response writer to get the status code
 	res := &responseWriter{ResponseWriter: rw, status: http.StatusOK}
 
 	h.FS.ServeHTTP(res, r)
 
-	j.Tracef("h.http.static.res", "Status: <%d>", res.status)
+	j.Trace("h.http.static.end", "Done", log.Int("status", res.status))
 }
 
 type responseWriter struct {

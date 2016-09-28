@@ -19,7 +19,9 @@ func (h *hearbeat) Start() {
 			break
 		case <-tick:
 			tags := map[string]string{
-				"type": h.app.Ctx().Name(),
+				"service": h.app.service,
+				"node":    h.app.config.Node,
+				"version": h.app.config.Version,
 			}
 
 			h.app.Ctx().Stats().Histogram("heartbeat", 1, tags)

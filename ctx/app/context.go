@@ -20,7 +20,6 @@ import (
 type Ctx interface {
 	ctx.Ctx
 
-	Name() string
 	L() log.Logger
 	Config() *config.Config
 	BG() *bg.Reg
@@ -28,30 +27,33 @@ type Ctx interface {
 
 // context holds the application context
 type context struct {
-	AppName   string
+	Service   string
 	AppConfig *config.Config
 	BGReg     *bg.Reg
 
-	l     log.Logger
-	stats stats.Stats
+	l       log.Logger
+	lFields []log.Field
+	stats   stats.Stats
 }
 
 // NewCtx creates a new app context
-func NewCtx(name string, c *config.Config, l log.Logger, s stats.Stats) Ctx {
+func NewCtx(service string, c *config.Config, l log.Logger, s stats.Stats) Ctx {
 	// Build background registry
 	reg := bg.NewReg(l)
 
+	lf := []log.Field{
+		log.String("node", c.Node),
+		log.String("version", c.Version),
+		log.String("log_type", "A"),
+	}
+
 	return &context{
-		AppName:   name,
 		AppConfig: c,
 		BGReg:     reg,
-		l:         l,
+		l:         l.AddCalldepth(1),
+		lFields:   lf,
 		stats:     s,
 	}
-}
-
-func (c *context) Name() string {
-	return c.AppName
 }
 
 func (c *context) L() log.Logger {
@@ -70,32 +72,16 @@ func (c *context) BG() *bg.Reg {
 	return c.BGReg
 }
 
-func (c *context) Trace(tag string, args ...interface{}) {
-	c.l.Trace(spaceOut(c.logPrefix(), tag, spaceOut(args...)))
+func (c *context) Trace(tag, msg string, fields ...log.Field) {
+	c.l.Trace(tag, msg, c.lFields...)
 }
 
-func (c *context) Tracef(tag string, format string, args ...interface{}) {
-	c.l.Trace(spaceOut(c.logPrefix(), tag, fmt.Sprintf(format, args...)))
+func (c *context) Warning(tag, msg string, fields ...log.Field) {
+	c.l.Warning(tag, msg, c.lFields...)
 }
 
-func (c *context) Warning(args ...interface{}) {
-	c.l.Warning(spaceOut(c.logPrefix(), spaceOut(args...)))
-}
-
-func (c *context) Warningf(format string, args ...interface{}) {
-	c.l.Warning(spaceOut(c.logPrefix(), fmt.Sprintf(format, args...)))
-}
-
-func (c *context) Error(args ...interface{}) {
-	c.l.Error(spaceOut(c.logPrefix(), spaceOut(args...)))
-}
-
-func (c *context) Errorf(format string, args ...interface{}) {
-	c.l.Error(spaceOut(c.logPrefix(), fmt.Sprintf(format, args...)))
-}
-
-func (c *context) logPrefix() string {
-	return fmt.Sprintf("A %s", c.AppName)
+func (c *context) Error(tag, msg string, fields ...log.Field) {
+	c.l.Error(tag, msg, c.lFields...)
 }
 
 // spaceOut joins the given args and separate them with spaces

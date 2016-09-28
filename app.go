@@ -11,6 +11,7 @@ import (
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/handler"
 	"github.com/stairlin/lego/log"
+	"github.com/stairlin/lego/log/logger"
 	statsAdapter "github.com/stairlin/lego/stats/adapter"
 )
 
@@ -19,6 +20,7 @@ type App struct {
 	mu    sync.Mutex
 	ready *sync.Cond
 
+	service  string
 	ctx      app.Ctx
 	config   *config.Config
 	handlers *handler.Reg
@@ -27,7 +29,7 @@ type App struct {
 }
 
 // New creates a new App and returns it
-func New(name string, appConfig interface{}) (*App, error) {
+func New(service string, appConfig interface{}) (*App, error) {
 	// Get config store
 	configStore, err := config.NewStore(os.Getenv("CONFIG_URI"))
 	if err != nil {
@@ -41,9 +43,12 @@ func New(name string, appConfig interface{}) (*App, error) {
 		return nil, fmt.Errorf("cannot load config: %s", err)
 	}
 
+	// Convert potential environment variables
+	c.Node = config.ValueOf(c.Node)
+	c.Version = config.ValueOf(c.Version)
+
 	// Create logger
-	// TODO : Extract to log package (per adapter)
-	l, err := log.NewStdLogger(c.Log.Level)
+	l, err := logger.New(service, &c.Log)
 	if err != nil {
 		return nil, fmt.Errorf("logger error: %s", err)
 	}
@@ -56,7 +61,7 @@ func New(name string, appConfig interface{}) (*App, error) {
 	s.SetLogger(l)
 
 	// Build app context
-	ctx := app.NewCtx(name, c, l, s)
+	ctx := app.NewCtx(service, c, l, s)
 
 	// Build ready cond flag
 	lock := &sync.Mutex{}
@@ -65,8 +70,10 @@ func New(name string, appConfig interface{}) (*App, error) {
 
 	// Build app struct
 	app := &App{
+		service:  service,
 		ready:    ready,
 		ctx:      ctx,
+		config:   c,
 		handlers: handler.NewReg(ctx),
 		done:     make(chan bool, 1),
 	}
@@ -88,11 +95,13 @@ func (a *App) Config() *config.Config {
 
 // Serve allows handlers to serve requests and blocks the call
 func (a *App) Serve() error {
-	a.ctx.Tracef("lego.serve", "start serving...")
+	a.ctx.Trace("lego.serve", "Start serving...")
 
 	err := a.handlers.Serve()
 	if err != nil {
-		a.ctx.Errorf("Error with handler.Serve (%s)", err)
+		a.ctx.Error("lego.serve.error", "Error with handler.Serve (%s)",
+			log.Error(err),
+		)
 		return err
 	}
 
@@ -111,7 +120,7 @@ func (a *App) Ready() {
 // Drain notify all handlers to enter in draining mode. It means they are no
 // longer accepting new requests, but they can finish all in-flight requests
 func (a *App) Drain() {
-	a.ctx.Tracef("lego.drain", "start draining...")
+	a.ctx.Trace("lego.drain", "Start draining...")
 
 	// Check if we are already stopping
 	a.mu.Lock()
@@ -139,7 +148,7 @@ func trapSignals(app *App) {
 
 	for {
 		sig := <-ch
-		app.Ctx().Tracef("lego.signal", "trapped <%s>", sig)
+		app.Ctx().Trace("lego.signal", "Signal trapped", log.String("sig", sig.String()))
 
 		switch sig {
 		case syscall.SIGINT, syscall.SIGTERM:

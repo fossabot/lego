@@ -9,19 +9,19 @@ import (
 func TestLogger(t *testing.T) {
 	tt := lt.New(t)
 	app := tt.NewAppCtx("journey-test")
+	logger := app.L().(*lt.Logger)
 
 	// Send a few log lines
 	app.Trace("j.test.trace", "A trace line")
-	app.Tracef("j.test.trace", "A %s trace line", "formatted")
-	app.Tracef("j.test.trace2", "Another %s trace line", "formatted")
-	app.Tracef("j.test.trace3", "Yet another %s trace line", "formatted")
-	app.Warning("A warning line")
-	app.Warning("Another warning line")
-	app.Warningf("A %s warning line", "formatted")
-	app.Error("A error line")
-	app.Errorf("A %s error line", "formatted")
+	app.Trace("j.test.trace", "A second trace line")
+	app.Trace("j.test.trace", "A third trace line")
+	app.Trace("j.test.trace", "A fourth trace line")
+	app.Warning("j.test.warning", "A warning line")
+	app.Warning("j.test.warning", "Another warning line")
+	app.Warning("j.test.warning", "Yet another warning line")
+	app.Error("j.test.error", "An error line")
+	app.Error("j.test.error", "Another error line")
 
-	logger := tt.Logger().(*lt.Logger)
 	tests := []struct {
 		severity string
 		expected int

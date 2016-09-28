@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/log"
 )
 
 // ErrEmptyReg is the error returned when there are no handlers registered
@@ -65,23 +66,32 @@ func (r *Reg) Serve() error {
 		go func(addr string, h H) {
 			// Deregister itself upon completion
 			defer func() {
-				r.ctx.Tracef("lego.serve.h.stop", "Handler <addr:%s> <h:%T> has stopped running", addr, h)
+				r.ctx.Trace("lego.serve.h.stop", "Handler has stopped running",
+					log.String("addr", addr),
+					log.Type("handler", h),
+				)
 				r.mu.Lock()
 				r.deregister(addr)
 				r.mu.Unlock()
 			}()
 
-			r.ctx.Tracef("lego.serve.h", "<addr:%s> <h:%T>", addr, h)
+			r.ctx.Trace("lego.serve.h", "Handler starts serving",
+				log.String("addr", addr),
+				log.Type("handler", h),
+			)
 			wg.Done()
 			err := h.Serve(addr, r.ctx)
 			if err != nil {
-				r.ctx.Errorf("Error with handler <h:%T> (%s)", h, err)
+				r.ctx.Error("lego.serve.h", "Handler error",
+					log.String("addr", addr),
+					log.Error(err),
+				)
 			}
 		}(addr, h)
 	}
 
 	wg.Wait() // Wait to boot all handlers
-	r.ctx.Tracef("handler.serve.ready", "All handlers are running")
+	r.ctx.Trace("handler.serve.ready", "All handlers are running")
 
 	return nil
 }
@@ -106,9 +116,13 @@ func (r *Reg) Drain() {
 	wg.Add(l)
 
 	// Drain handlers
-	r.ctx.Tracef("handler.drain.init", "Start draining... <%d>", l)
+	r.ctx.Trace("handler.drain.init", "Start draining",
+		log.Int("handlers", l),
+	)
 	for _, h := range r.l {
-		r.ctx.Tracef("handler.drain.h", "%T", h)
+		r.ctx.Trace("handler.drain.h", "Drain handler",
+			log.Type("handler", h),
+		)
 		go func(h H) {
 			h.Drain()
 			wg.Done()
@@ -118,7 +132,7 @@ func (r *Reg) Drain() {
 	wg.Wait()
 
 	r.drain = false
-	r.ctx.Tracef("handler.drain.done", "All handlers have been drained")
+	r.ctx.Trace("handler.drain.done", "All handlers have been drained")
 }
 
 func (r *Reg) register(addr string, h H) error {

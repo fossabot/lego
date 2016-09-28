@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/stairlin/lego/ctx/journey"
+	"github.com/stairlin/lego/log"
 )
 
 const (
@@ -25,16 +26,20 @@ func PickParser(ctx journey.Ctx, req *http.Request) Parser {
 	ct := req.Header.Get("Content-Type")
 	m, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
 	if err != nil {
-		ctx.Warningf("cannot parse Content-Type <%s> (%s)", ct, err)
+		// This can probably be demoted to a warning at some point
+		ctx.Error("http.content_type.err", "Cannot parse Content-Type",
+			log.String("content_type", ct),
+			log.Error(err),
+		)
 	}
 
 	switch m {
 	case mimeJSON:
-		ctx.Trace("action.parser.json")
+		ctx.Trace("action.parser", "Pick JSON parser", log.String("type", mimeJSON))
 		return &ParseJSON{req}
 	}
 
-	ctx.Trace("action.parser.null")
+	ctx.Trace("action.parser", "Pick null parser", log.String("type", "null"))
 	return &ParseNull{m}
 }
 
