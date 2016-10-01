@@ -36,7 +36,7 @@ type context struct {
 // NewCtx creates a new app context
 func NewCtx(service string, c *config.Config, l log.Logger, s stats.Stats) Ctx {
 	// Build background registry
-	reg := bg.NewReg(l)
+	reg := bg.NewReg(service, l, s)
 
 	lf := []log.Field{
 		log.String("node", c.Node),

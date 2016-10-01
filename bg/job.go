@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/stairlin/lego/log"
+	"github.com/stairlin/lego/stats"
 )
 
 // ErrDrain is the error returned when a new job attempts to be started during
@@ -24,16 +25,20 @@ type Job interface {
 type Reg struct {
 	mu sync.Mutex
 
-	drain bool
-	log   log.Logger
-	jobs  map[Job]*status
+	drain   bool
+	service string
+	log     log.Logger
+	stats   stats.Stats
+	jobs    map[Job]*status
 }
 
 // NewReg builds a new registry
-func NewReg(log log.Logger) *Reg {
+func NewReg(service string, log log.Logger, stats stats.Stats) *Reg {
 	return &Reg{
-		log:  log,
-		jobs: map[Job]*status{},
+		service: service,
+		log:     log,
+		stats:   stats,
+		jobs:    map[Job]*status{},
 	}
 }
 
@@ -121,11 +126,21 @@ func (r *Reg) register(j Job) *status {
 		started: make(chan struct{}, 1),
 	}
 	r.jobs[j] = s
+
+	r.addStats()
+
 	return s
 }
 
 func (r *Reg) deregister(j Job) {
 	delete(r.jobs, j)
+	r.addStats()
+}
+
+func (r *Reg) addStats() {
+	r.stats.Gauge("bg.jobs", len(r.jobs), map[string]string{
+		"service": r.service,
+	})
 }
 
 type status struct {
