@@ -72,22 +72,23 @@ func (c *context) BG() *bg.Reg {
 
 func (c *context) Trace(tag, msg string, fields ...log.Field) {
 	c.l.Trace(tag, msg, c.lFields...)
-	c.incLogLevelCount(log.LevelTrace)
+	c.incLogLevelCount(log.LevelTrace, tag)
 }
 
 func (c *context) Warning(tag, msg string, fields ...log.Field) {
 	c.l.Warning(tag, msg, c.lFields...)
-	c.incLogLevelCount(log.LevelWarning)
+	c.incLogLevelCount(log.LevelWarning, tag)
 }
 
 func (c *context) Error(tag, msg string, fields ...log.Field) {
 	c.l.Error(tag, msg, c.lFields...)
-	c.incLogLevelCount(log.LevelError)
+	c.incLogLevelCount(log.LevelError, tag)
 }
 
-func (c *context) incLogLevelCount(lvl log.Level) {
+func (c *context) incLogLevelCount(lvl log.Level, tag string) {
 	tags := map[string]string{
 		"level":   lvl.String(),
+		"tag":     tag,
 		"service": c.Service,
 		"node":    c.AppConfig.Node,
 		"version": c.AppConfig.Version,
