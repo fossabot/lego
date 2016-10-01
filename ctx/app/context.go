@@ -6,9 +6,6 @@
 package app
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/stairlin/lego/bg"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx"
@@ -48,6 +45,7 @@ func NewCtx(service string, c *config.Config, l log.Logger, s stats.Stats) Ctx {
 	}
 
 	return &context{
+		Service:   service,
 		AppConfig: c,
 		BGReg:     reg,
 		l:         l.AddCalldepth(1),
@@ -74,21 +72,26 @@ func (c *context) BG() *bg.Reg {
 
 func (c *context) Trace(tag, msg string, fields ...log.Field) {
 	c.l.Trace(tag, msg, c.lFields...)
+	c.incLogLevelCount(log.LevelTrace)
 }
 
 func (c *context) Warning(tag, msg string, fields ...log.Field) {
 	c.l.Warning(tag, msg, c.lFields...)
+	c.incLogLevelCount(log.LevelWarning)
 }
 
 func (c *context) Error(tag, msg string, fields ...log.Field) {
 	c.l.Error(tag, msg, c.lFields...)
+	c.incLogLevelCount(log.LevelError)
 }
 
-// spaceOut joins the given args and separate them with spaces
-func spaceOut(args ...interface{}) string {
-	l := make([]string, len(args))
-	for i, a := range args {
-		l[i] = fmt.Sprint(a)
+func (c *context) incLogLevelCount(lvl log.Level) {
+	tags := map[string]string{
+		"level":   lvl.String(),
+		"service": c.Service,
+		"node":    c.AppConfig.Node,
+		"version": c.AppConfig.Version,
 	}
-	return strings.Join(l, " ")
+
+	c.stats.Histogram("log.level", 1, tags)
 }
