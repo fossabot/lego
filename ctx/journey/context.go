@@ -84,16 +84,19 @@ func (c *context) ShortID() string {
 func (c *context) Trace(tag, msg string, fields ...log.Field) {
 	c.incTag(tag)
 	c.log().Trace(tag, msg, c.logFields(fields)...)
+	c.incLogLevelCount(log.LevelTrace)
 }
 
 func (c *context) Warning(tag, msg string, fields ...log.Field) {
 	c.incTag(tag)
 	c.log().Warning(tag, msg, c.logFields(fields)...)
+	c.incLogLevelCount(log.LevelWarning)
 }
 
 func (c *context) Error(tag, msg string, fields ...log.Field) {
 	c.incTag(tag)
 	c.log().Error(tag, msg, c.logFields(fields)...)
+	c.incLogLevelCount(log.LevelError)
 }
 
 func (c *context) logFields(fields []log.Field) []log.Field {
@@ -119,6 +122,17 @@ func (c *context) incTag(tag string) {
 	}
 
 	c.stats().Histogram("log", 1, tags)
+}
+
+func (c *context) incLogLevelCount(lvl log.Level) {
+	tags := map[string]string{
+		"level":   lvl.String(),
+		"service": c.AppConfig().Service,
+		"node":    c.AppConfig().Node,
+		"version": c.AppConfig().Version,
+	}
+
+	c.app.Stats().Histogram("log.level", 1, tags)
 }
 
 func (c *context) stats() stats.Stats {
