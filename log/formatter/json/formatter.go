@@ -33,27 +33,21 @@ func (f *Formatter) Format(ctx *log.Ctx, tag, msg string, fields ...log.Field) (
 	return string(r), nil
 }
 
-func formatFields(fields []log.Field) []kv {
-	l := make([]kv, len(fields))
-	for i, f := range fields {
+func formatFields(fields []log.Field) map[string]interface{} {
+	m := map[string]interface{}{}
+	for _, f := range fields {
 		k, v := f.KV()
-		l[i] = kv{K: k, V: v}
+		m[k] = v
 	}
-	return l
+	return m
 }
 
 type out struct {
-	Level     string `json:"level"`
-	Timestamp string `json:"timestamp"`
-	Service   string `json:"service"`
-	File      string `json:"file"`
-	Type      string `json:"type"`
-	Tag       string `json:"tag,omitempty"`
-	Msg       string `json:"msg"`
-	Fields    []kv   `json:"fields"`
-}
-
-type kv struct {
-	K string `json:"k"`
-	V string `json:"v"`
+	Level     string                 `json:"level"`
+	Timestamp string                 `json:"timestamp"`
+	Service   string                 `json:"service"`
+	File      string                 `json:"file"`
+	Tag       string                 `json:"tag,omitempty"`
+	Msg       string                 `json:"msg"`
+	Fields    map[string]interface{} `json:"fields"`
 }
