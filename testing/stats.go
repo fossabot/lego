@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -22,7 +23,8 @@ const (
 
 // Stats is a simple Stats interface useful for tests
 type Stats struct {
-	t *testing.T
+	t  *testing.T
+	mu sync.Mutex
 
 	Data map[string][]StatsPoint
 }
@@ -45,6 +47,9 @@ func (s *Stats) Start()                 {}
 func (s *Stats) Stop()                  {}
 func (s *Stats) SetLogger(l log.Logger) {}
 func (s *Stats) Count(key string, n interface{}, meta ...map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	k := s.Data[key]
 	data := StatsPoint{
 		Op:   OpCount,
@@ -54,6 +59,9 @@ func (s *Stats) Count(key string, n interface{}, meta ...map[string]string) {
 	s.Data[key] = append(k, data)
 }
 func (s *Stats) Inc(key string, meta ...map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	k := s.Data[key]
 	data := StatsPoint{
 		Op:   OpInc,
@@ -62,6 +70,9 @@ func (s *Stats) Inc(key string, meta ...map[string]string) {
 	s.Data[key] = append(k, data)
 }
 func (s *Stats) Dec(key string, meta ...map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	k := s.Data[key]
 	data := StatsPoint{
 		Op:   OpDec,
@@ -70,6 +81,9 @@ func (s *Stats) Dec(key string, meta ...map[string]string) {
 	s.Data[key] = append(k, data)
 }
 func (s *Stats) Gauge(key string, n interface{}, meta ...map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	k := s.Data[key]
 	data := StatsPoint{
 		Op:   OpGauge,
@@ -79,6 +93,9 @@ func (s *Stats) Gauge(key string, n interface{}, meta ...map[string]string) {
 	s.Data[key] = append(k, data)
 }
 func (s *Stats) Timing(key string, d time.Duration, meta ...map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	k := s.Data[key]
 	data := StatsPoint{
 		Op:   OpTiming,
@@ -88,6 +105,9 @@ func (s *Stats) Timing(key string, d time.Duration, meta ...map[string]string) {
 	s.Data[key] = append(k, data)
 }
 func (s *Stats) Histogram(key string, n interface{}, meta ...map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	k := s.Data[key]
 	data := StatsPoint{
 		Op:   OpHistogram,

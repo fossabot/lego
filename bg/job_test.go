@@ -13,7 +13,7 @@ import (
 // only once
 func TestJobRegistration(t *testing.T) {
 	tt := lt.New(t)
-	reg := bg.NewReg(tt.Logger())
+	reg := bg.NewReg("TestJobRegistration", tt.Logger(), tt.Stats())
 	job := NewDummyJob(time.Microsecond)
 
 	if err := reg.Dispatch(job); err != nil {
@@ -29,7 +29,7 @@ func TestJobRegistration(t *testing.T) {
 // after its completion
 func TestJobDeregistration(t *testing.T) {
 	tt := lt.New(t)
-	reg := bg.NewReg(tt.Logger())
+	reg := bg.NewReg("TestJobDeregistration", tt.Logger(), tt.Stats())
 	job := NewDummyJob(time.Microsecond)
 	job.exec = time.Microsecond * 5
 
@@ -49,7 +49,7 @@ func TestJobDeregistration(t *testing.T) {
 // when the registry is in drain mode
 func TestJobRegistrationDrainMode(t *testing.T) {
 	tt := lt.New(t)
-	reg := bg.NewReg(tt.Logger())
+	reg := bg.NewReg("TestJobRegistrationDrainMode", tt.Logger(), tt.Stats())
 
 	// Set registry to drain mode
 	reg.Drain()
@@ -63,7 +63,7 @@ func TestJobRegistrationDrainMode(t *testing.T) {
 // TestJobDraining tests whether the registry drains properly the in-flight jobs
 func TestJobDraining(t *testing.T) {
 	tt := lt.New(t)
-	reg := bg.NewReg(tt.Logger())
+	reg := bg.NewReg("TestJobDraining", tt.Logger(), tt.Stats())
 
 	jobs := []*DummyJob{
 		NewDummyJob(0),
