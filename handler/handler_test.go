@@ -62,6 +62,9 @@ func TestServe(t *testing.T) {
 		t.Error("expect Serve to not return an error", err)
 	}
 
+	// Serve ensures that handlers are booting, but they might not run (yet)
+	time.Sleep(256 * time.Microsecond)
+
 	// Ensure all handlers have been started
 	for i, item := range l {
 		if !item.h.IsRunning() {
