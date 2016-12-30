@@ -3,6 +3,9 @@ package journey_test
 import (
 	"strings"
 	"testing"
+	"time"
+
+	netCtx "golang.org/x/net/context"
 
 	"github.com/stairlin/lego/ctx/journey"
 	lt "github.com/stairlin/lego/testing"
@@ -77,5 +80,66 @@ func TestLogger(t *testing.T) {
 				res,
 			)
 		}
+	}
+}
+
+// TestCancellation ensures that the context is being released upon cancellation
+func TestCancellation(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+	j := journey.New(app)
+
+	j.Cancel()
+
+	select {
+	case <-j.Done():
+		tt.Log("cancel released the context")
+		expect := netCtx.Canceled
+		if j.Err() != expect {
+			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
+		}
+	case <-time.After(time.Microsecond * 250):
+		tt.Error("expect cancel to release the context")
+	}
+}
+
+// TestTimeout ensures that the context is being release after the given timeout
+func TestTimeout(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+
+	app.Config().Request.TimeoutMS = 1
+
+	j := journey.New(app)
+
+	select {
+	case <-j.Done():
+		tt.Log("timeout released the context")
+		expect := netCtx.DeadlineExceeded
+		if j.Err() != expect {
+			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
+		}
+	case <-time.After(time.Millisecond * (app.Config().Request.TimeoutMS + 50)):
+		tt.Error("expect cancel to release the context")
+	}
+}
+
+// TestEnd ensures that the context is being release without errors when End() is called
+func TestEnd(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+	j := journey.New(app)
+
+	j.End()
+
+	select {
+	case <-j.Done():
+		tt.Log("end released the context")
+		expect := netCtx.Canceled
+		if j.Err() != expect {
+			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
+		}
+	case <-time.After(time.Microsecond * 250):
+		tt.Error("expect cancel to release the context")
 	}
 }

@@ -24,7 +24,7 @@ func buildMiddlewareChain(l []Middleware, a Action) CallFunc {
 	return c
 }
 
-// mwDraining blocks request when the handler is draining
+// mwDraining blocks the request when the handler is draining
 func mwDraining(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
 		if c.isDraining() {
@@ -35,7 +35,25 @@ func mwDraining(next CallFunc) CallFunc {
 	}
 }
 
-// mwDraining blocks request when the handler is draining
+// mwInterrupt returns the request when the context deadline expires or is being cancelled
+func mwInterrupt(next CallFunc) CallFunc {
+	return func(c *Context) Renderer {
+		res := make(chan Renderer, 1)
+		go func() {
+			res <- next(c)
+		}()
+
+		select {
+		case r := <-res:
+			return r
+		case <-c.Ctx.Done():
+			c.Ctx.Trace("http.mw.interrupt", "Request cancelled or timed out", log.Error(c.Ctx.Err()))
+			return c.Head(http.StatusGatewayTimeout)
+		}
+	}
+}
+
+// mwDraining blocks the request when the handler is draining
 func mwLogging(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
 		c.Ctx.Trace("h.http.req.start", "Request start",
@@ -55,7 +73,7 @@ func mwLogging(next CallFunc) CallFunc {
 	}
 }
 
-// mwStats sends request/response stats
+// mwStats sends the request/response stats
 func mwStats(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
 		tags := map[string]string{

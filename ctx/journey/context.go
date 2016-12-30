@@ -10,8 +10,11 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/satori/go.uuid"
+	netCtx "golang.org/x/net/context"
+
 	"github.com/stairlin/lego/bg"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx"
@@ -28,16 +31,26 @@ type Ctx interface {
 	ShortID() string
 	AppConfig() *config.Config
 	BG(f func()) error
+	Cancel()
+	End()
+
+	// Net context functions
+	Deadline() (deadline time.Time, ok bool)
+	Done() <-chan struct{}
+	Err() error
+	Value(key interface{}) interface{}
 }
 
 // context holds the context of a request (journey) during its whole lifecycle
 type context struct {
 	mu sync.Mutex
 
-	ID     string // (hopefuly) globally unique identifier
-	Step   uint
-	app    app.Ctx
-	logger log.Logger
+	ID         string // (hopefuly) globally unique identifier
+	C          netCtx.Context
+	Step       uint
+	app        app.Ctx
+	logger     log.Logger
+	cancelFunc func()
 }
 
 // New creates a new context and returns it
@@ -49,11 +62,22 @@ func New(ctx app.Ctx) Ctx {
 		log.String("id", id),
 	)
 
-	return &context{
+	j := &context{
 		ID:     id,
 		app:    ctx,
 		logger: ctx.L(),
 	}
+
+	// Build net context from its parent context
+	reqConfig := ctx.Config().Request
+	if reqConfig.Timeout() != 0 {
+		j.Trace("ctx.journey.deadline", "Set deadline", log.Time("deadline", time.Now().Add(reqConfig.Timeout())))
+		j.C, j.cancelFunc = netCtx.WithTimeout(ctx.RootContext(), ctx.Config().Request.Timeout())
+	} else {
+		j.C, j.cancelFunc = netCtx.WithCancel(ctx.RootContext())
+	}
+
+	return j
 }
 
 // AppConfig returns the application configuration on which this context currently runs
@@ -68,6 +92,20 @@ func (c *context) Stats() stats.Stats {
 // BG executes the given function in background
 func (c *context) BG(f func()) error {
 	return c.app.BG().Dispatch(bg.NewTask(f))
+}
+
+// Cancel tells an operation to abandon its work.
+// Cancel does not wait for the work to stop.
+// After the first call, subsequent calls to Cancel do nothing.
+func (c *context) Cancel() {
+	c.Trace("ctx.journey.cancel", "Cancelling the operation")
+	c.cancelFunc()
+}
+
+// End marks the end of a journey. It does the same thing as Cancel, but just reveals better the intention
+func (c *context) End() {
+	c.Trace("ctx.journey.end", "End of this context")
+	c.cancelFunc()
 }
 
 // UUID returns the universally unique identifier assigned to this context
@@ -99,6 +137,37 @@ func (c *context) Error(tag, msg string, fields ...log.Field) {
 	c.incLogLevelCount(log.LevelError, tag)
 }
 
+// # Net Context functions
+// These are implemented in order to use a journey context as a net context
+
+// Deadline returns the time when work done on behalf of this context
+// should be canceled. Deadline returns ok==false when no deadline is
+// set. Successive calls to Deadline return the same results.
+func (c *context) Deadline() (deadline time.Time, ok bool) { return c.C.Deadline() }
+
+// Done returns a channel that's closed when work done on behalf of this
+// context should be canceled. Done may return nil if this context can
+// never be canceled. Successive calls to Done return the same value.
+func (c *context) Done() <-chan struct{} { return c.C.Done() }
+
+// Err returns a non-nil error value after Done is closed. Err returns
+// Canceled if the context was canceled or DeadlineExceeded if the
+// context's deadline passed. No other values for Err are defined.
+// After Done is closed, successive calls to Err return the same value.
+func (c *context) Err() error { return c.C.Err() }
+
+// Value returns the value associated with this context for key, or nil
+// if no value is associated with key. Successive calls to Value with
+// the same key returns the same result.
+//
+// Use context values only for request-scoped data that transits
+// processes and API boundaries, not for passing optional parameters to
+// functions.
+func (c *context) Value(key interface{}) interface{} {
+	c.Trace("ctx.journey.value", "Add net context value", log.Object("value", key))
+	return c.C.Value(key)
+}
+
 func (c *context) logFields(fields []log.Field) []log.Field {
 	f := []log.Field{
 		log.String("log_type", "J"),
@@ -110,10 +179,15 @@ func (c *context) logFields(fields []log.Field) []log.Field {
 }
 
 func (c *context) log() log.Logger {
+	c.incStep()
+	return c.logger
+}
+
+func (c *context) incStep() uint {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.Step++
-	return c.logger
+	return c.Step
 }
 
 func (c *context) incTag(tag string) {

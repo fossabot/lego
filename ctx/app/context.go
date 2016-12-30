@@ -6,6 +6,8 @@
 package app
 
 import (
+	netCtx "golang.org/x/net/context"
+
 	"github.com/stairlin/lego/bg"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx"
@@ -20,6 +22,7 @@ type Ctx interface {
 	L() log.Logger
 	Config() *config.Config
 	BG() *bg.Reg
+	RootContext() netCtx.Context
 }
 
 // context holds the application context
@@ -27,6 +30,7 @@ type context struct {
 	Service   string
 	AppConfig *config.Config
 	BGReg     *bg.Reg
+	RootCtx   netCtx.Context
 
 	l       log.Logger
 	lFields []log.Field
@@ -48,6 +52,7 @@ func NewCtx(service string, c *config.Config, l log.Logger, s stats.Stats) Ctx {
 		Service:   service,
 		AppConfig: c,
 		BGReg:     reg,
+		RootCtx:   netCtx.Background(),
 		l:         l.AddCalldepth(1),
 		lFields:   lf,
 		stats:     s,
@@ -68,6 +73,10 @@ func (c *context) Config() *config.Config {
 
 func (c *context) BG() *bg.Reg {
 	return c.BGReg
+}
+
+func (c *context) RootContext() netCtx.Context {
+	return c.RootCtx
 }
 
 func (c *context) Trace(tag, msg string, fields ...log.Field) {
