@@ -9,7 +9,6 @@ package journey
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/satori/go.uuid"
@@ -23,6 +22,14 @@ import (
 	"github.com/stairlin/lego/stats"
 )
 
+// Type represents a context type (Foreground or Background)
+type Type int
+
+const (
+	Child Type = iota
+	Root
+)
+
 // Ctx is the journey context interface
 type Ctx interface {
 	ctx.Ctx
@@ -30,7 +37,8 @@ type Ctx interface {
 	UUID() string
 	ShortID() string
 	AppConfig() *config.Config
-	BG(f func()) error
+	BG(f func(c Ctx)) error
+	BranchOff(t Type) Ctx
 	Cancel()
 	End()
 
@@ -43,11 +51,10 @@ type Ctx interface {
 
 // context holds the context of a request (journey) during its whole lifecycle
 type context struct {
-	mu sync.Mutex
-
+	Type       Type
 	ID         string // (hopefuly) globally unique identifier
 	C          netCtx.Context
-	Step       uint
+	Stepper    Stepper
 	app        app.Ctx
 	logger     log.Logger
 	cancelFunc func()
@@ -63,9 +70,11 @@ func New(ctx app.Ctx) Ctx {
 	)
 
 	j := &context{
-		ID:     id,
-		app:    ctx,
-		logger: ctx.L(),
+		Type:    Root,
+		ID:      id,
+		Stepper: *NewStepper(),
+		app:     ctx,
+		logger:  ctx.L(),
 	}
 
 	// Build net context from its parent context
@@ -90,8 +99,19 @@ func (c *context) Stats() stats.Stats {
 }
 
 // BG executes the given function in background
-func (c *context) BG(f func()) error {
-	return c.app.BG().Dispatch(bg.NewTask(f))
+func (c *context) BG(f func(Ctx)) error {
+	childCtx := c.BranchOff(Root)
+
+	return c.app.BG().Dispatch(bg.NewTask(func() {
+		f(childCtx)
+
+		// End the context if it has not already been done
+		select {
+		case <-childCtx.Done():
+		default:
+			childCtx.End()
+		}
+	}))
 }
 
 // Cancel tells an operation to abandon its work.
@@ -172,22 +192,15 @@ func (c *context) logFields(fields []log.Field) []log.Field {
 	f := []log.Field{
 		log.String("log_type", "J"),
 		log.String("id", c.ShortID()),
-		log.Uint("step", c.Step),
+		log.String("step", c.Stepper.String()),
 	}
 
 	return append(f, fields...)
 }
 
 func (c *context) log() log.Logger {
-	c.incStep()
+	c.Stepper.Inc()
 	return c.logger
-}
-
-func (c *context) incStep() uint {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.Step++
-	return c.Step
 }
 
 func (c *context) incTag(tag string) {
@@ -214,15 +227,42 @@ func (c *context) stats() stats.Stats {
 	return c.app.Stats()
 }
 
+// BranchOff returns a new child context that branches off from the original context
+func (c *context) BranchOff(t Type) Ctx {
+	c.Trace("ctx.journey.branch_off", "New sub context", log.String("id", c.ID))
+	ctx := c.createSubCtx()
+
+	// If we have a root context, we break the context cancellation propagation
+	if t == Root {
+		ctx.C = netCtx.Background()
+		return ctx
+	}
+
+	// Otherwise, create a new net context from its parent
+	if deadline, ok := c.C.Deadline(); ok {
+		ctx.C, ctx.cancelFunc = netCtx.WithDeadline(c.C, deadline)
+	} else {
+		ctx.C, ctx.cancelFunc = netCtx.WithCancel(c.C)
+	}
+	return ctx
+}
+
+func (c *context) createSubCtx() *context {
+	return &context{
+		ID:         c.ID,
+		Stepper:    *c.Stepper.BranchOff(),
+		C:          nil,
+		app:        c.app,
+		logger:     c.logger,
+		cancelFunc: func() {},
+	}
+}
+
 // spaceOut joins the given args and separate them with spaces
 func spaceOut(args ...interface{}) string {
 	l := make([]string, len(args))
 	for i, a := range args {
 		l[i] = fmt.Sprint(a)
 	}
-	return strings.Join(l, " ")
-}
-
-func buildLogLine(l ...string) string {
 	return strings.Join(l, " ")
 }
