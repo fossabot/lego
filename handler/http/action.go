@@ -65,7 +65,7 @@ func (h *actionHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	// Assign unique request ID
 	journey := journey.New(h.app)
-	journey.Trace("http.hello", "Test")
+	defer journey.End()
 
 	// Build context
 	c := &Context{

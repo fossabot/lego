@@ -3,6 +3,9 @@ package journey_test
 import (
 	"strings"
 	"testing"
+	"time"
+
+	netCtx "golang.org/x/net/context"
 
 	"github.com/stairlin/lego/ctx/journey"
 	lt "github.com/stairlin/lego/testing"
@@ -77,5 +80,140 @@ func TestLogger(t *testing.T) {
 				res,
 			)
 		}
+	}
+}
+
+// TestCancellation ensures that the context is being released upon cancellation
+func TestCancellation(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+	j := journey.New(app)
+
+	j.Cancel()
+
+	select {
+	case <-j.Done():
+		tt.Log("cancel released the context")
+		expect := netCtx.Canceled
+		if j.Err() != expect {
+			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
+		}
+	case <-time.After(time.Microsecond * 250):
+		tt.Error("expect cancel to release the context")
+	}
+}
+
+// TestCancellationPropagation ensures that the cancellation propagates
+// to sub contexts when the root context is being cancelled
+func TestCancellationPropagation(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+	root := journey.New(app)
+	child := root.BranchOff(journey.Child)
+	grandchild := child.BranchOff(journey.Child)
+
+	root.Cancel()
+
+	for i, ctx := range []journey.Ctx{root, child, grandchild} {
+		select {
+		case <-ctx.Done():
+			tt.Log("cancel released the context")
+			expect := netCtx.Canceled
+			if ctx.Err() != expect {
+				tt.Errorf("%d - expect error to be <%s>, but got <%s>", i, expect, ctx.Err())
+			}
+		case <-time.After(time.Microsecond * 250):
+			tt.Errorf("%d - expect cancel to release the context", i)
+		}
+	}
+}
+
+// TestTimeout ensures that the context is being release after the given timeout
+func TestTimeout(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+
+	app.Config().Request.TimeoutMS = 1
+
+	j := journey.New(app)
+
+	select {
+	case <-j.Done():
+		tt.Log("timeout released the context")
+		expect := netCtx.DeadlineExceeded
+		if j.Err() != expect {
+			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
+		}
+	case <-time.After(time.Millisecond * (app.Config().Request.TimeoutMS + 50)):
+		tt.Error("expect cancel to release the context")
+	}
+}
+
+// TestEnd ensures that the context is being release without errors when End() is called
+func TestEnd(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+	j := journey.New(app)
+
+	j.End()
+
+	select {
+	case <-j.Done():
+		tt.Log("end released the context")
+		expect := netCtx.Canceled
+		if j.Err() != expect {
+			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
+		}
+	case <-time.After(time.Microsecond * 250):
+		tt.Error("expect cancel to release the context")
+	}
+}
+
+// TestBG_Context ensures that the given context is a child context
+func TestBG_Context(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+	j := journey.New(app)
+
+	res := make(chan journey.Ctx, 1)
+	j.BG(func(c journey.Ctx) {
+		res <- c
+	})
+
+	select {
+	case c := <-res:
+		if c == j {
+			tt.Error("expect BG context to be different than parent context")
+		}
+	case <-time.After(time.Microsecond * 250):
+		tt.Error("expect to receive context, but got nothing")
+	}
+}
+
+// TestBG_Cancellation ensures that the parent context cannot cancel a background context
+func TestBG_Cancellation(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+	root := journey.New(app)
+
+	res := make(chan journey.Ctx, 1)
+	root.BG(func(c journey.Ctx) {
+		res <- c
+		time.Sleep(time.Millisecond * 5)
+	})
+
+	var child journey.Ctx
+	select {
+	case c := <-res:
+		child = c
+	}
+
+	root.Cancel()
+
+	select {
+	case <-child.Done():
+		tt.Error("expect to child context to be running")
+	default:
+		tt.Log("child context still running")
 	}
 }
