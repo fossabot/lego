@@ -1,12 +1,15 @@
 install:
-		go get github.com/tools/godep && \
-        ${GOPATH}/bin/godep restore
+		curl https://glide.sh/get | sh && \
+        glide install
 
 dist: build
-		${GOPATH}/bin/godep save
+		glide install
+
+update: build
+		glide up --all-dependencies
 
 build:
-		go build ./...
+		go build $(glide nv)
 
 test:
-		go test ./...
+		glide nv | xargs go test -v -race

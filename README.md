@@ -1,4 +1,4 @@
-# lego
+# lego [![CircleCI](https://circleci.com/gh/stairlin/lego.svg?style=svg)](https://circleci.com/gh/stairlin/lego)
 
 ```shell
 CONFIG_URI=file://${PWD}/config/dev.json go run main.go -logtostderr
