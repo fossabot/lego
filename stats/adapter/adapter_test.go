@@ -15,7 +15,7 @@ func TestDefaultAdapters(t *testing.T) {
 		t.Fatalf("expect to get %d registered adapters, but got %d", len(expected), len(l))
 	}
 
-	for i, _ := range expected {
+	for i := range expected {
 		if l[i] != expected[i] {
 			t.Errorf("expect to get adapter %s, but got %s", expected[i], l[i])
 		}

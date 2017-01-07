@@ -1,6 +1,6 @@
 // Package journey defines a context type, which carries information about
 // a specific inbound request. It is created when it hits the first service
-// and it is propagated accross all services.
+// and it is propagated across all services.
 //
 // It has been named journey instead of request, because a journey can result
 // of multiple sub-requests. And also because it sounds nice, isn't it?
@@ -52,7 +52,7 @@ type Ctx interface {
 // context holds the context of a request (journey) during its whole lifecycle
 type context struct {
 	Type       Type
-	ID         string // (hopefuly) globally unique identifier
+	ID         string // (hopefully) globally unique identifier
 	C          netCtx.Context
 	Stepper    Stepper
 	app        app.Ctx

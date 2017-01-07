@@ -4,7 +4,7 @@
 //
 // Background jobs will typically be potentially long operations, such as
 // uploading files, sending emails or push notifications. It can also
-// be used for services that run infinitly like heartbeat signals or stats
+// be used for services that run infinitely like heartbeat signals or stats
 // worker.
 //
 // Package bg guarantee that a dispatched job will be started even a registry
