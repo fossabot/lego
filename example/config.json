@@ -1,0 +1,22 @@
+{
+    "node": "node.test",
+    "version": "test",
+    "log": {
+        "level": "trace",
+        "formatter": {
+            "adapter": "logf"
+        },
+        "printer": {
+            "adapter": "stdout"
+        }
+    },
+    "stats": {
+        "on": false
+    },
+    "request": {
+        "timeout_ms": 500
+    },
+    "app": {
+        "foo": "bar"
+    }
+}
