@@ -12,7 +12,6 @@ Basic setup
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
@@ -26,8 +25,6 @@ type AppConfig struct {
 }
 
 func main() {
-	flag.Parse()
-
 	// Create lego
 	config := &AppConfig{}
 	app, err := lego.New("api", config)
