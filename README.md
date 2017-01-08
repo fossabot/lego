@@ -16,7 +16,7 @@ Go is gaining popularity at exponential speed, but adopting the language to buil
 LEGO is a framework designed to grow with developers from the first service to multiple resilient microservices at descent scale.
 
 ### 2. Defer decisions
-Making technical decisions can be needlessly time consuming, specially at the early stage of a product development. That is the reason why LEGO made a lot of these decisions for you and as trivial as possible. That means you won't be locked-in into a specific vendor technology.
+Making technical decisions can be needlessly time consuming, especially at the early stage of a product development. That is the reason why LEGO made a lot of these decisions for you and as trivial as possible. That means you won't be locked-in into a specific vendor technology.
 
 ### 3. Not for everyone
 Even though LEGO can grow with your product, it does not necessarily mean that it is the right choice for you. LEGO primarily solves Stairlin's problems and may discard very important problems in your product. Nevertheless, LEGO is open to new ideas and contributions as long as they are consistent with our philosophy.
@@ -41,7 +41,7 @@ $ curl -v http://127.0.0.1:3000/ping
 
 ### Simple HTTP server
 
-This code creates a lego instance and attach and HTTP handler to it with one route `/ping`.
+This code creates a LEGO instance and attach and HTTP handler to it with one route `/ping`.
 
 ```go
 package main
