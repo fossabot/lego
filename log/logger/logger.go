@@ -26,6 +26,8 @@ func New(service string, config *config.Log) (log.Logger, error) {
 	return &Logger{service: service, fmt: f, pnt: p, calldepth: 1}, nil
 }
 
+// Logger is the key struct of the log package.
+// It is the part that links the log formatter to the log printer
 type Logger struct {
 	service   string
 	level     log.Level
@@ -36,24 +38,33 @@ type Logger struct {
 	fields []log.Field
 }
 
+// Trace creates a trace log line.
+// Trace level logs are to follow the code executio step by step
 func (l *Logger) Trace(tag, msg string, fields ...log.Field) {
 	l.log(log.LevelTrace, tag, msg, fields...)
 }
 
+// Warning creates a trace log line.
+// Warning level logs are meant to draw attention above a certain threshold
 func (l *Logger) Warning(tag, msg string, fields ...log.Field) {
 	l.log(log.LevelWarning, "", msg, fields...)
 }
 
+// Error creates a trace log line.
+// Error level logs need immediate attention
+// The 2AM rule applies here, which means that if you are on call, this log line will wake you up at 2AM
 func (l *Logger) Error(tag, msg string, fields ...log.Field) {
 	l.log(log.LevelError, "", msg, fields...)
 }
 
+// With adds the given fields to a cloned logger
 func (l *Logger) With(fields ...log.Field) log.Logger {
 	c := l.clone()
 	c.fields = append(c.fields, fields...)
 	return c
 }
 
+// AddCalldepth clones the logger and changes the call depth
 func (l *Logger) AddCalldepth(n int) log.Logger {
 	c := l.clone()
 	c.calldepth = c.calldepth + n

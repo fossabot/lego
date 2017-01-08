@@ -1,3 +1,7 @@
+// Package json is a JSON log formatter.
+//
+// It is a good solution for production environment where log lines
+// are usually sent to a log aggregator, such as Elasticsearch (ELK stack), or Splunk.
 package json
 
 import (

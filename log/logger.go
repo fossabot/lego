@@ -14,7 +14,7 @@ const (
 	LevelError
 )
 
-// LevelName returns a string representation of the given level
+// String returns a string representation of the given level
 func (l Level) String() string {
 	switch l {
 	case LevelTrace:

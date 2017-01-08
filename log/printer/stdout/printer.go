@@ -1,3 +1,5 @@
+// Package stdout prints log lines into the standard output.
+// It also colorised outputs with ANSI Escape Codes
 package stdout
 
 import (

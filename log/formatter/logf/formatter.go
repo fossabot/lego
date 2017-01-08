@@ -1,3 +1,7 @@
+// Package logf is a human friendly log formatter.
+//
+// It is ideal for a development environment where
+// log lines are almost exlusively consumed by developers
 package logf
 
 import (
