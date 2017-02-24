@@ -80,18 +80,22 @@ func (c *context) RootContext() netCtx.Context {
 }
 
 func (c *context) Trace(tag, msg string, fields ...log.Field) {
-	c.l.Trace(tag, msg, c.lFields...)
+	c.l.Trace(tag, msg, c.logFields(fields)...)
 	c.incLogLevelCount(log.LevelTrace, tag)
 }
 
 func (c *context) Warning(tag, msg string, fields ...log.Field) {
-	c.l.Warning(tag, msg, c.lFields...)
+	c.l.Warning(tag, msg, c.logFields(fields)...)
 	c.incLogLevelCount(log.LevelWarning, tag)
 }
 
 func (c *context) Error(tag, msg string, fields ...log.Field) {
-	c.l.Error(tag, msg, c.lFields...)
+	c.l.Error(tag, msg, c.logFields(fields)...)
 	c.incLogLevelCount(log.LevelError, tag)
+}
+
+func (c *context) logFields(fields []log.Field) []log.Field {
+	return append(c.lFields, fields...)
 }
 
 func (c *context) incLogLevelCount(lvl log.Level, tag string) {
