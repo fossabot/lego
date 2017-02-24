@@ -9,11 +9,11 @@ import (
 )
 
 const (
-	// T is the TRACE log constant
+	// TC is the TRACE log constant
 	TC = "TRACE"
-	// W is the WARNING log constant
+	// WN is the WARNING log constant
 	WN = "WARN"
-	// E is the ERROR log constant
+	// ER is the ERROR log constant
 	ER = "ERRR"
 )
 
