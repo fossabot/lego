@@ -47,14 +47,14 @@ func (l *Logger) Trace(tag, msg string, fields ...log.Field) {
 // Warning creates a trace log line.
 // Warning level logs are meant to draw attention above a certain threshold
 func (l *Logger) Warning(tag, msg string, fields ...log.Field) {
-	l.log(log.LevelWarning, "", msg, fields...)
+	l.log(log.LevelWarning, tag, msg, fields...)
 }
 
 // Error creates a trace log line.
 // Error level logs need immediate attention
 // The 2AM rule applies here, which means that if you are on call, this log line will wake you up at 2AM
 func (l *Logger) Error(tag, msg string, fields ...log.Field) {
-	l.log(log.LevelError, "", msg, fields...)
+	l.log(log.LevelError, tag, msg, fields...)
 }
 
 // With adds the given fields to a cloned logger
