@@ -43,7 +43,5 @@ func (s *Store) Load(config interface{}) error {
 	}
 
 	// Unmarshal
-	json.Unmarshal(r, config)
-
-	return nil
+	return json.Unmarshal(r, config)
 }
