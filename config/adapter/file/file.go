@@ -1,4 +1,7 @@
 // Package file reads configuration from a JSON file
+//
+// e.g.
+// CONFIG_URI=file://${PWD}/config/dev.json
 package file
 
 import (
