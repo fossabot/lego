@@ -1,34 +1,39 @@
-hash: 3560c5174199adf584a6587fc8ee61620f454cb8e8c44c25420e5060813fbeda
-updated: 2017-01-02T10:57:45.700982988+01:00
+hash: c24467aa7141cd2a09012d7bd20ef1b2a49bedac47f2c91eb917652cda5f6b4a
+updated: 2017-02-25T17:16:18.067438397+01:00
 imports:
-- name: github.com/coreos/etcd
-  version: 3d5ba43211beec7fbb1472634a9c3b464581658a
-  subpackages:
-  - client
-  - pkg/pathutil
-  - pkg/types
 - name: github.com/fatih/color
-  version: dea9d3a26a087187530244679c1cfb3a42937794
+  version: 7824417a424b65227be8ac9b14d545a7f3e6c3f0
 - name: github.com/gorilla/context
   version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
 - name: github.com/gorilla/mux
-  version: 0eeaf8392f5b04950925b8a69fe70f110fa7cbfc
+  version: 392c28fe23e1c45ddba891b0320b3b5df220beea
+- name: github.com/hashicorp/consul
+  version: f5fe659497cecbc6947e0ad06af295e4633a3c30
+  subpackages:
+  - api
+- name: github.com/hashicorp/go-cleanhttp
+  version: 3573b8b52aa7b37b9358d966a898feb387f62437
+- name: github.com/hashicorp/serf
+  version: 838c422c419776dd868ade08da6b11be7a71bf99
+  subpackages:
+  - coordinate
 - name: github.com/mattn/go-colorable
-  version: 9fdad7c47650b7d2e1da50644c1f4ba7f172f252
+  version: 5411d3eea5978e6cdc258b30de592b60df6aba96
+  repo: https://github.com/mattn/go-colorable
 - name: github.com/mattn/go-isatty
-  version: 56b76bdf51f7708750eac80fa38b952bb9f32639
+  version: dda3de49cbfcec471bd7a70e6cc01fcc3ff90109
+  repo: https://github.com/mattn/go-isatty
+- name: github.com/pkg/errors
+  version: 248dadf4e9068a0b3e79f02ed0a610d935de5302
 - name: github.com/satori/go.uuid
   version: 879c5887cd475cd7864858769793b2ceb0d44feb
-- name: github.com/ugorji/go
-  version: f1f1a805ed361a0e078bb537e4ea78cd37dcf065
-  subpackages:
-  - codec
 - name: golang.org/x/net
-  version: 6acef71eb69611914f7a30939ea9f6e194c78172
+  version: 10c134ea0df15f7e34d789338c7a2d76cc7a3ab9
   subpackages:
   - context
 - name: golang.org/x/sys
-  version: 9c60d1c508f5134d1ca726b4641db998f2523357
+  version: e24f485414aeafb646f6fca458b0bf869c0880a1
+  repo: https://go.googlesource.com/sys
   subpackages:
   - unix
 testImports: []

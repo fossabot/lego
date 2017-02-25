@@ -1,9 +1,5 @@
 package: github.com/stairlin/lego
 import:
-- package: github.com/coreos/etcd
-  version: ^3.1.0-rc.1
-  subpackages:
-  - client
 - package: github.com/fatih/color
   version: ^1.1.0
 - package: github.com/gorilla/mux
