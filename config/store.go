@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/stairlin/lego/config/adapter"
+	"github.com/stairlin/lego/config/adapter/consul"
 	"github.com/stairlin/lego/config/adapter/file"
 )
 
@@ -17,6 +18,7 @@ var (
 
 func init() {
 	// Register default adapters
+	Register(consul.Name, consul.New)
 	Register(file.Name, file.New)
 }
 
