@@ -8,7 +8,7 @@ import (
 
 // TestDefaultAdapters tests whether the default adapters are registered
 func TestDefaultAdapters(t *testing.T) {
-	expected := []string{"etcd", "file"}
+	expected := []string{"file"}
 
 	l := config.Adapters()
 	if len(l) != len(expected) {

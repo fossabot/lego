@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/stairlin/lego/config/adapter"
-	"github.com/stairlin/lego/config/adapter/etcd"
 	"github.com/stairlin/lego/config/adapter/file"
 )
 
@@ -18,7 +17,6 @@ var (
 
 func init() {
 	// Register default adapters
-	Register(etcd.Name, etcd.New)
 	Register(file.Name, file.New)
 }
 
