@@ -26,6 +26,7 @@ func (r *RenderJSON) Status() int {
 func (r *RenderJSON) Encode(ctx *Context) error {
 	// Header
 	ctx.Res.Header().Add("Content-Type", "application/json; charset=utf-8")
+	ctx.Res.WriteHeader(r.Code)
 
 	// Body
 	json, err := json.Marshal(r.V)
