@@ -9,6 +9,8 @@ import (
 
 func TestLogger(t *testing.T) {
 	tt := lt.New(t)
+	tt.DisableStrictMode()
+
 	app := tt.NewAppCtx("journey-test")
 	logger := app.L().(*lt.Logger)
 
@@ -48,6 +50,8 @@ func TestLogger(t *testing.T) {
 
 func TestLogLevelStats(t *testing.T) {
 	tt := lt.New(t)
+	tt.DisableStrictMode()
+
 	app := tt.NewAppCtx("journey-test")
 	stats := app.Stats().(*lt.Stats)
 	key := "log.level"

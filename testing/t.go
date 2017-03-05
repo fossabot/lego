@@ -25,7 +25,7 @@ type T struct {
 func New(t *testing.T) *T {
 	return &T{
 		t:      t,
-		logger: NewLogger(t),
+		logger: NewLogger(t, true),
 		stats:  NewStats(t),
 		config: &config.Config{},
 	}
@@ -49,6 +49,11 @@ func (t *T) Config() *config.Config {
 // Logger returns a lego logger interface
 func (t *T) NewAppCtx(name string) app.Ctx {
 	return app.NewCtx(name, t.Config(), t.Logger(), t.Stats())
+}
+
+// DisableStrictMode will stop making error logs failing a test
+func (t *T) DisableStrictMode() {
+	t.logger = NewLogger(t.t, false)
 }
 
 // Standard go testing.T functions

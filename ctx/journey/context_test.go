@@ -45,6 +45,8 @@ func TestAppConfig(t *testing.T) {
 
 func TestLogger(t *testing.T) {
 	tt := lt.New(t)
+	tt.DisableStrictMode()
+
 	app := tt.NewAppCtx("journey-test")
 	j := journey.New(app)
 	logger := app.L().(*lt.Logger)

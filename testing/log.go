@@ -25,14 +25,16 @@ type Logger struct {
 	calldepth int
 	lines     map[string]int
 	fields    []log.Field
+	strict    bool
 }
 
 // NewLogger creates a new logger
-func NewLogger(t *testing.T) log.Logger {
+func NewLogger(t *testing.T, strict bool) log.Logger {
 	return &Logger{
 		t:         t,
 		calldepth: 1,
 		lines:     map[string]int{},
+		strict:    strict,
 	}
 }
 
@@ -56,14 +58,20 @@ func (l *Logger) Lines(s string) int {
 
 func (l *Logger) Trace(tag, msg string, fields ...log.Field)   { l.l(TC, tag, msg, fields...) }
 func (l *Logger) Warning(tag, msg string, fields ...log.Field) { l.l(WN, tag, msg, fields...) }
-func (l *Logger) Error(tag, msg string, fields ...log.Field)   { l.l(ER, tag, msg, fields...) }
+func (l *Logger) Error(tag, msg string, fields ...log.Field) {
+	l.l(ER, tag, msg, fields...)
+
+	if l.strict {
+		l.t.Error(format(tag, msg, fields...)) // Make the tests fail
+	}
+}
 func (l *Logger) With(fields ...log.Field) log.Logger {
-	nl := NewLogger(l.t).(*Logger)
+	nl := NewLogger(l.t, l.strict).(*Logger)
 	nl.fields = append(l.fields, fields...)
 	return nl
 }
 func (l *Logger) AddCalldepth(n int) log.Logger {
-	nl := NewLogger(l.t).(*Logger)
+	nl := NewLogger(l.t, l.strict).(*Logger)
 	nl.calldepth = nl.calldepth + n
 	return nl
 }
