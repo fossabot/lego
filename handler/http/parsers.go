@@ -27,7 +27,7 @@ func PickParser(ctx journey.Ctx, req *http.Request) Parser {
 	m, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
 	if err != nil {
 		// This can probably be demoted to a warning at some point
-		ctx.Error("http.content_type.err", "Cannot parse Content-Type",
+		ctx.Warning("http.content_type.err", "Cannot parse Content-Type",
 			log.String("content_type", ct),
 			log.Error(err),
 		)
