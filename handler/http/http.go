@@ -41,11 +41,11 @@ func NewHandler() *Handler {
 	h := &Handler{}
 
 	// Register required middlewares
-	h.Append(mwInterrupt)
-	h.Append(mwPanic)
 	h.Append(mwDraining)
+	h.Append(mwInterrupt)
 	h.Append(mwStats)
 	h.Append(mwLogging)
+	h.Append(mwPanic)
 
 	return h
 }
