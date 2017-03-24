@@ -13,7 +13,7 @@ Go is gaining popularity at exponential speed, but adopting the language to buil
 	3. Not for everyone
 
 ### 1. Grow with the product
-LEGO is a framework designed to grow with developers from the first service to multiple resilient microservices at descent scale.
+LEGO is a framework designed to grow with developers from the first service to multiple resilient microservices at decent scale.
 
 ### 2. Defer decisions
 Making technical decisions can be needlessly time consuming, especially at the early stage of a product development. That is the reason why LEGO made a lot of these decisions for you and as trivial as possible. That means you won't be locked-in into a specific vendor technology.
