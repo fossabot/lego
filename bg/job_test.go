@@ -37,7 +37,8 @@ func TestJobDeregistration(t *testing.T) {
 		t.Error("expect to be able to start job after its first registration", err)
 	}
 
-	<-job.done // wait for job to stop
+	<-job.done                      // wait for job to stop
+	time.Sleep(5 * time.Nanosecond) // The deregistration goroutine, might not be executed otherwise
 	job.reset()
 
 	if err := reg.Dispatch(job); err != nil {
