@@ -3,6 +3,7 @@ package http
 import (
 	"fmt"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/stairlin/lego/log"
@@ -105,6 +106,7 @@ func mwPanic(next CallFunc) CallFunc {
 					p = true
 					c.Ctx.Error("http.mw.panic", "Recovered from panic",
 						log.Object("err", err),
+						log.String("stack", string(debug.Stack())),
 					)
 				}
 			}()
