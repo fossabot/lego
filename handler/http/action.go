@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"
-	"github.com/stairlin/lego/log"
 )
 
 // Action is an endpoint that handles incoming HTTP requests for a specific route.
@@ -87,13 +86,5 @@ func (h *actionHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Add("X-Request-Id", journey.UUID())
 
 	// Start call chain
-	renderer := h.callChain(c)
-
-	// Encode response
-	err := renderer.Encode(c)
-	if err != nil {
-		journey.Error("action.encode.error", "Renderer error", log.Error(err))
-		c.Res.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	h.callChain(c)
 }

@@ -46,6 +46,7 @@ func NewHandler() *Handler {
 	h.Append(mwStats)
 	h.Append(mwLogging)
 	h.Append(mwPanic)
+	h.Append(mwRender)
 
 	return h
 }

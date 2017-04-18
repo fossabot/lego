@@ -94,6 +94,7 @@ func mwStats(next CallFunc) CallFunc {
 	}
 }
 
+// mwPanic catches panic and recover
 func mwPanic(next CallFunc) CallFunc {
 	return func(c *Context) Renderer {
 		p := false
@@ -117,6 +118,23 @@ func mwPanic(next CallFunc) CallFunc {
 		if p {
 			return c.Head(http.StatusInternalServerError)
 		}
+		return r
+	}
+}
+
+// mwRender encodes the response
+func mwRender(next CallFunc) CallFunc {
+	return func(c *Context) Renderer {
+		r := next(c)
+
+		// Encode response
+		err := r.Encode(c)
+		if err != nil {
+			c.Ctx.Error("http.mw.render", "Renderer error", log.Error(err))
+			c.Res.WriteHeader(http.StatusInternalServerError)
+			return r
+		}
+
 		return r
 	}
 }
