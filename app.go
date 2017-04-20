@@ -47,6 +47,11 @@ func New(service string, appConfig interface{}) (*App, error) {
 	c.Node = config.ValueOf(c.Node)
 	c.Version = config.ValueOf(c.Version)
 
+	return NewWithConfig(service, c)
+}
+
+// NewWithConfig creates a new App with the config config
+func NewWithConfig(service string, c *config.Config) (*App, error) {
 	// Create logger
 	l, err := logger.New(service, &c.Log)
 	if err != nil {
