@@ -16,15 +16,15 @@ type Config struct {
 
 // Log contains all log-related configuration
 type Log struct {
-	Level     string `json:"level"`
-	Formatter struct {
-		Adapter string            `json:"adapter"`
-		Config  map[string]string `json:"config"`
-	} `json:"formatter"`
-	Printer struct {
-		Adapter string            `json:"adapter"`
-		Config  map[string]string `json:"config"`
-	} `json:"printer"`
+	Level     string        `json:"level"`
+	Formatter AdapterConfig `json:"formatter"`
+	Printer   AdapterConfig `json:"printer"`
+}
+
+// AdapterConfig is a generic config struct for adapters
+type AdapterConfig struct {
+	Adapter string            `json:"adapter"`
+	Config  map[string]string `json:"config"`
 }
 
 // Stats contains all stats-related configuration
