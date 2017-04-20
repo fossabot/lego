@@ -6,7 +6,6 @@ import (
 
 // Config defines the app config
 type Config struct {
-	Service string      `json:"service"`
 	Node    string      `json:"node"`
 	Version string      `json:"version"`
 	Request Request     `json:"request"`
