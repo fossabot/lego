@@ -215,7 +215,7 @@ func (c *context) incLogLevelCount(lvl log.Level, tag string) {
 	tags := map[string]string{
 		"level":   lvl.String(),
 		"tag":     tag,
-		"service": c.AppConfig().Service,
+		"service": c.app.Service(),
 		"node":    c.AppConfig().Node,
 		"version": c.AppConfig().Version,
 	}

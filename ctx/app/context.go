@@ -19,6 +19,7 @@ import (
 type Ctx interface {
 	ctx.Ctx
 
+	Service() string
 	L() log.Logger
 	Config() *config.Config
 	BG() *bg.Reg
@@ -27,11 +28,11 @@ type Ctx interface {
 
 // context holds the application context
 type context struct {
-	Service   string
 	AppConfig *config.Config
 	BGReg     *bg.Reg
 	RootCtx   netCtx.Context
 
+	service string
 	l       log.Logger
 	lFields []log.Field
 	stats   stats.Stats
@@ -49,7 +50,7 @@ func NewCtx(service string, c *config.Config, l log.Logger, s stats.Stats) Ctx {
 	}
 
 	return &context{
-		Service:   service,
+		service:   service,
 		AppConfig: c,
 		BGReg:     reg,
 		RootCtx:   netCtx.Background(),
@@ -57,6 +58,10 @@ func NewCtx(service string, c *config.Config, l log.Logger, s stats.Stats) Ctx {
 		lFields:   lf,
 		stats:     s,
 	}
+}
+
+func (c *context) Service() string {
+	return c.service
 }
 
 func (c *context) L() log.Logger {
@@ -102,7 +107,7 @@ func (c *context) incLogLevelCount(lvl log.Level, tag string) {
 	tags := map[string]string{
 		"level":   lvl.String(),
 		"tag":     tag,
-		"service": c.Service,
+		"service": c.service,
 		"node":    c.AppConfig.Node,
 		"version": c.AppConfig.Version,
 	}
