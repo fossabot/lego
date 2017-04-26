@@ -10,16 +10,18 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var bodyRequestMethods = []string{POST, PUT, DELETE}
+var bodyRequestMethods = map[string]struct{}{
+	POST:   struct{}{},
+	PUT:    struct{}{},
+	PATCH:  struct{}{},
+	DELETE: struct{}{},
+	LINK:   struct{}{},
+	UNLINK: struct{}{},
+}
 
 func hasBody(m string) bool {
-	for _, method := range bodyRequestMethods {
-		if m == method {
-			return true
-		}
-	}
-
-	return false
+	_, ok := bodyRequestMethods[m]
+	return ok
 }
 
 // Handler is a lego handler for the HTTP protocol
