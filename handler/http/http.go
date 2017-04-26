@@ -63,6 +63,11 @@ func (h *Handler) Handle(path, method string, a Action) {
 	h.routes = append(h.routes, r)
 }
 
+// HandleFunc registers a new function as an action on the given path and method
+func (h *Handler) HandleFunc(path, method string, f CallFunc) {
+	h.Handle(path, method, &actionFunc{f: f})
+}
+
 // Append appends the given middleware to the call chain
 func (h *Handler) Append(m Middleware) {
 	h.middlewares = append(h.middlewares, m)

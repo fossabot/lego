@@ -15,6 +15,14 @@ type Action interface {
 	Call(c *Context) Renderer
 }
 
+type actionFunc struct {
+	f func(c *Context) Renderer
+}
+
+func (a *actionFunc) Call(c *Context) Renderer {
+	return a.f(c)
+}
+
 // CallFunc is the contract required to be callable on the call chain
 type CallFunc func(c *Context) Renderer
 
