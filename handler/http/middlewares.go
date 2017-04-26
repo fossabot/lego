@@ -31,9 +31,9 @@ func buildMiddlewareChain(l []Middleware, action MiddlewareFunc) MiddlewareFunc 
 func mwStartJourney(next MiddlewareFunc) MiddlewareFunc {
 	return func(c *Context) int {
 		// Assign unique request ID
-		journey := journey.New(c.App)
+		c.Ctx = journey.New(c.App)
 		status := next(c)
-		journey.End()
+		c.Ctx.End()
 		return status
 	}
 }
