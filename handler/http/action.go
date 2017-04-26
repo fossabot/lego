@@ -91,7 +91,7 @@ func (h *actionHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add request ID to response header (useful for debugging)
-	rw.Header().Add("X-Request-Id", journey.UUID())
+	rw.Header().Add("Request-Id", journey.UUID())
 
 	// Start call chain
 	h.callChain(c)
