@@ -21,11 +21,9 @@ type Parser interface {
 	Parse(v interface{}) error
 }
 
-// PickParser selects a Parser for the request content-type
-func PickParser(ctx journey.Ctx, req *http.Request) Parser {
-	ctx.Trace("action.parser.content_length", "Request content length",
-		log.Int64("len", req.ContentLength),
-	)
+// pickParser selects a Parser for the request content-type
+func pickParser(ctx journey.Ctx, req *http.Request) Parser {
+	ctx.Trace("action.parser.content_length", "Request content length", log.Int64("len", req.ContentLength))
 
 	// If content type is not provided and the request body is empty,
 	// then there is no need to pick a parser

@@ -24,7 +24,7 @@ func main() {
 
 	// Register HTTP handler
 	h := http.NewHandler()
-	h.Handle("/ping", http.GET, &Ping{})
+	h.HandleFunc("/ping", http.GET, Ping)
 	app.RegisterHandler("127.0.0.1:3000", h)
 
 	// Start serving requests
@@ -35,10 +35,8 @@ func main() {
 	}
 }
 
-// HTTP handler example
-type Ping struct{}
-
-func (a *Ping) Call(c *http.Context) http.Renderer {
-	c.Ctx.Trace("action.ping", "Simple request", log.Time("start_at", c.StartAt))
+// Ping handler example
+func Ping(c *http.Context) http.Renderer {
+	c.Ctx.Trace("action.ping", "Simple request", log.Time("start_time", c.StartTime))
 	return c.Head(http.StatusOK)
 }

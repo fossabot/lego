@@ -17,7 +17,7 @@ func TestBuildMiddlewares(t *testing.T) {
 	}
 	a := &dummyAction{}
 
-	c := buildMiddlewareChain(l, a)
+	c := buildMiddlewareChain(l, renderActionFunc(a.Call))
 
 	c(&Context{})
 
@@ -37,8 +37,8 @@ func (f *mwFactory) newMiddleware(expected int) Middleware {
 	n := f.N
 	f.N++
 
-	return func(next CallFunc) CallFunc {
-		return func(c *Context) Renderer {
+	return func(next MiddlewareFunc) MiddlewareFunc {
+		return func(c *Context) int {
 			f.C++
 			if n != expected {
 				f.t.Errorf("expect to be called in position %d, but got %d", expected, n)
