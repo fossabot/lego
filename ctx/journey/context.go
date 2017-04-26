@@ -38,6 +38,7 @@ type Ctx interface {
 	ShortID() string
 	AppConfig() *config.Config
 	BG(f func(c Ctx)) error
+	KV() KV
 	BranchOff(t Type) Ctx
 	Cancel()
 	End()
@@ -55,6 +56,7 @@ type context struct {
 	ID         string // (hopefully) globally unique identifier
 	C          netCtx.Context
 	Stepper    Stepper
+	Store      KV
 	app        app.Ctx
 	logger     log.Logger
 	cancelFunc func()
@@ -73,6 +75,7 @@ func New(ctx app.Ctx) Ctx {
 		Type:    Root,
 		ID:      id,
 		Stepper: *NewStepper(),
+		Store:   newKV(),
 		app:     ctx,
 		logger:  ctx.L(),
 	}
@@ -155,6 +158,10 @@ func (c *context) Error(tag, msg string, fields ...log.Field) {
 	c.incTag(tag)
 	c.log().Error(tag, msg, c.logFields(fields)...)
 	c.incLogLevelCount(log.LevelError, tag)
+}
+
+func (c *context) KV() KV {
+	return c.Store
 }
 
 // # Net Context functions

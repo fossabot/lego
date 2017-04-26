@@ -4,23 +4,11 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/gorilla/mux"
+
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/log"
-
-	"github.com/gorilla/mux"
 )
-
-var bodyRequestMethods = []string{POST, PUT, DELETE}
-
-func hasBody(m string) bool {
-	for _, method := range bodyRequestMethods {
-		if m == method {
-			return true
-		}
-	}
-
-	return false
-}
 
 // Handler is a lego handler for the HTTP protocol
 type Handler struct {
@@ -41,22 +29,28 @@ func NewHandler() *Handler {
 	h := &Handler{}
 
 	// Register required middlewares
+	h.Append(mwStartJourney)
+	h.Append(mwDebug)
 	h.Append(mwDraining)
-	h.Append(mwInterrupt)
 	h.Append(mwStats)
 	h.Append(mwLogging)
+	h.Append(mwInterrupt)
 	h.Append(mwPanic)
-	h.Append(mwRender)
 
 	return h
 }
 
 // Handle registers a new action on the given path and method
 func (h *Handler) Handle(path, method string, a Action) {
+	h.HandleFunc(path, method, a.Call)
+}
+
+// HandleFunc registers a new function as an action on the given path and method
+func (h *Handler) HandleFunc(path, method string, f ActionFunc) {
 	r := Route{
 		Path:   path,
 		Method: method,
-		Action: a,
+		Action: f,
 	}
 	h.routes = append(h.routes, r)
 }
@@ -78,9 +72,9 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 	// Map actions
 	r := mux.NewRouter()
 	for _, route := range h.routes {
-		chain := buildMiddlewareChain(h.middlewares, route.Action)
+		chain := buildMiddlewareChain(h.middlewares, renderActionFunc(route.Action))
 
-		h := &actionHandler{
+		h := bareHandler{
 			path:       route.Path,
 			method:     route.Method,
 			a:          route.Action,
@@ -88,10 +82,9 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 			isDraining: h.isDraining,
 			add:        h.add,
 			done:       h.done,
-			callChain:  chain,
+			call:       chain,
 		}
-
-		r.Handle(route.Path, h).Methods(route.Method, OPTIONS)
+		r.Handle(route.Path, &h).Methods(route.Method, OPTIONS)
 	}
 
 	// Map static directory (if any)
@@ -101,16 +94,14 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 			log.String("dir", h.static.Dir),
 		)
 
-		sh := &staticHandler{
+		sh := staticHandler{
 			App: ctx,
 			FS:  &fileHandler{root: http.Dir(h.static.Dir)},
 		}
-		r.PathPrefix(h.static.Path).Handler(http.StripPrefix(h.static.Path, sh))
+		r.PathPrefix(h.static.Path).Handler(http.StripPrefix(h.static.Path, &sh))
 	}
 
-	ctx.Trace("h.http.listen", "Listening...",
-		log.String("addr", addr),
-	)
+	ctx.Trace("h.http.listen", "Listening...", log.String("addr", addr))
 	return http.ListenAndServe(addr, r)
 }
 

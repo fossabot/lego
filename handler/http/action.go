@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/stairlin/lego/ctx/app"
-	"github.com/stairlin/lego/ctx/journey"
+	"github.com/stairlin/lego/log"
 )
 
 // Action is an endpoint that handles incoming HTTP requests for a specific route.
@@ -15,76 +15,52 @@ type Action interface {
 	Call(c *Context) Renderer
 }
 
-// CallFunc is the contract required to be callable on the call chain
-type CallFunc func(c *Context) Renderer
+// ActionFunc is the function signature of an action
+type ActionFunc func(c *Context) Renderer
 
-// Context holds the request context that is injected into an action
-type Context struct {
-	Ctx     journey.Ctx
-	Res     http.ResponseWriter
-	Req     *http.Request
-	Parser  Parser
-	Params  map[string]string
-	StartAt time.Time
-
-	isDraining func() bool
-	action     Action
+// renderActionFunc returns a func that executes the action and encodes the response with a renderer
+func renderActionFunc(f ActionFunc) MiddlewareFunc {
+	return func(c *Context) int {
+		renderer := f(c)
+		if err := renderer.Encode(c); err != nil {
+			c.Ctx.Error("http.render", "Renderer error", log.Error(err))
+			return http.StatusInternalServerError
+		}
+		return renderer.Status()
+	}
 }
 
-// JSON encodes the given data to JSON
-func (c *Context) JSON(code int, data interface{}) Renderer {
-	return &RenderJSON{Code: code, V: data}
-}
-
-// Head returns a body-less response
-func (c *Context) Head(code int) Renderer {
-	return &RenderHead{Code: code}
-}
-
-// Redirect returns an HTTP redirection response
-func (c *Context) Redirect(url string) Renderer {
-	return &RenderRedirect{URL: url}
-}
-
-type actionHandler struct {
-	path       string
+type bareHandler struct {
 	method     string
-	a          Action
+	path       string
+	a          ActionFunc
 	app        app.Ctx
 	isDraining func() bool
 	add        func()
 	done       func()
-	callChain  CallFunc
+	call       MiddlewareFunc
 }
 
-func (h *actionHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (h *bareHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	// Add to waitgroup
 	h.add()
 	defer h.done()
 
-	// Assign unique request ID
-	journey := journey.New(h.app)
-	defer journey.End()
-
 	// Build context
 	c := &Context{
-		Ctx:        journey,
-		Res:        rw,
-		Req:        r,
-		Params:     mux.Vars(r),
-		StartAt:    time.Now(),
+		App:       h.app,
+		Ctx:       nil,
+		StartTime: time.Now(),
+		Params:    mux.Vars(r),
+		Method:    h.method,
+		Path:      h.path,
+		Res:       rw,
+		Req:       r,
+
 		isDraining: h.isDraining,
 		action:     h.a,
 	}
 
-	// Pick decoder
-	if hasBody(r.Method) {
-		c.Parser = PickParser(journey, r)
-	}
-
-	// Add request ID to response header (useful for debugging)
-	rw.Header().Add("X-Request-Id", journey.UUID())
-
 	// Start call chain
-	h.callChain(c)
+	rw.WriteHeader(h.call(c))
 }

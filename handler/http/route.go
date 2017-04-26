@@ -10,7 +10,7 @@ import (
 type Route struct {
 	Path   string
 	Method string
-	Action Action
+	Action ActionFunc
 }
 
 // table returns a nice-looking route table
