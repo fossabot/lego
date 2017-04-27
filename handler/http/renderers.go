@@ -51,6 +51,7 @@ func (r *RenderRedirect) Render(res http.ResponseWriter, req *http.Request) erro
 }
 
 type RenderData struct {
+	Code        int
 	ContentType string
 	Reader      io.ReadCloser
 }
@@ -60,6 +61,7 @@ func (r *RenderData) Render(res http.ResponseWriter, req *http.Request) error {
 	if r.ContentType != "" {
 		res.Header()["Content-Type"] = []string{r.ContentType}
 	}
+	res.WriteHeader(r.Code)
 	_, err := io.Copy(res, r.Reader)
 	return err
 }

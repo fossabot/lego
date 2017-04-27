@@ -46,11 +46,12 @@ func (c *Context) Redirect(url string) Renderer {
 }
 
 // Data encodes an arbitrary type of data
-func (c *Context) Data(contentType string, data io.ReadCloser) Renderer {
+func (c *Context) Data(code int, contentType string, data io.ReadCloser) Renderer {
 	return &RenderData{ContentType: contentType, Reader: data}
 }
 
-// Data encodes an arbitrary type of data
+// Conditional checks whether the request conditions are fresh.
+// If the request is fresh, it returns a 304, otherwise it calls the next renderer
 func (c *Context) Conditional(etag string, lastModified time.Time, next Renderer) Renderer {
 	return &RenderConditional{ETag: etag, LastModified: lastModified, Renderer: next}
 }
