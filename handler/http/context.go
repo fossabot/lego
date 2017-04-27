@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"io"
+
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"
 )
@@ -16,8 +18,8 @@ type Context struct {
 	Params    map[string]string
 	Method    string
 	Path      string
-	Res       http.ResponseWriter
 	Req       *http.Request
+	Res       *Response
 
 	isDraining func() bool
 	action     ActionFunc
@@ -41,4 +43,14 @@ func (c *Context) Head(code int) Renderer {
 // Redirect returns an HTTP redirection response
 func (c *Context) Redirect(url string) Renderer {
 	return &RenderRedirect{URL: url}
+}
+
+// Data encodes an arbitrary type of data
+func (c *Context) Data(contentType string, data io.ReadCloser) Renderer {
+	return &RenderData{ContentType: contentType, Reader: data}
+}
+
+// Data encodes an arbitrary type of data
+func (c *Context) Conditional(etag string, lastModified time.Time, next Renderer) Renderer {
+	return &RenderConditional{ETag: etag, LastModified: lastModified, Renderer: next}
 }

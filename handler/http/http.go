@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -131,4 +132,40 @@ func (h *Handler) add() {
 // done signals the end of a request
 func (h *Handler) done() {
 	h.wg.Done()
+}
+
+type bareHandler struct {
+	method     string
+	path       string
+	a          ActionFunc
+	app        app.Ctx
+	isDraining func() bool
+	add        func()
+	done       func()
+	call       MiddlewareFunc
+}
+
+func (h *bareHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Add to waitgroup
+	h.add()
+	defer h.done()
+
+	// Build context
+	res := Response{http: w}
+	c := Context{
+		App:       h.app,
+		Ctx:       nil,
+		StartTime: time.Now(),
+		Params:    mux.Vars(r),
+		Method:    h.method,
+		Path:      h.path,
+		Res:       &res,
+		Req:       r,
+
+		isDraining: h.isDraining,
+		action:     h.a,
+	}
+
+	// Start call chain
+	h.call(&c)
 }

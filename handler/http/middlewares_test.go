@@ -1,6 +1,7 @@
 package http
 
 import (
+	"net/http"
 	"testing"
 
 	lt "github.com/stairlin/lego/testing"
@@ -38,12 +39,12 @@ func (f *mwFactory) newMiddleware(expected int) Middleware {
 	f.N++
 
 	return func(next MiddlewareFunc) MiddlewareFunc {
-		return func(c *Context) int {
+		return func(c *Context) {
 			f.C++
 			if n != expected {
 				f.t.Errorf("expect to be called in position %d, but got %d", expected, n)
 			}
-			return next(c)
+			next(c)
 		}
 	}
 }
@@ -51,8 +52,7 @@ func (f *mwFactory) newMiddleware(expected int) Middleware {
 type dummyRenderer struct {
 }
 
-func (r *dummyRenderer) Status() int           { return StatusOK }
-func (r *dummyRenderer) Encode(*Context) error { return nil }
+func (r *dummyRenderer) Render(res http.ResponseWriter, req *http.Request) error { return nil }
 
 type dummyAction struct {
 }
