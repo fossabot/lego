@@ -53,5 +53,5 @@ func (c *Context) Data(code int, contentType string, data io.ReadCloser) Rendere
 // Conditional checks whether the request conditions are fresh.
 // If the request is fresh, it returns a 304, otherwise it calls the next renderer
 func (c *Context) Conditional(etag string, lastModified time.Time, next Renderer) Renderer {
-	return &RenderConditional{ETag: etag, LastModified: lastModified, Renderer: next}
+	return &RenderConditional{ETag: etag, LastModified: lastModified, Next: next}
 }

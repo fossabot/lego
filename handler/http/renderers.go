@@ -69,7 +69,7 @@ func (r *RenderData) Render(res http.ResponseWriter, req *http.Request) error {
 type RenderConditional struct {
 	ETag         string
 	LastModified time.Time
-	Renderer     Renderer
+	Next         Renderer
 }
 
 func (r *RenderConditional) Render(res http.ResponseWriter, req *http.Request) error {
@@ -86,5 +86,5 @@ func (r *RenderConditional) Render(res http.ResponseWriter, req *http.Request) e
 		res.WriteHeader(http.StatusNotModified)
 		return nil
 	}
-	return r.Render(res, req) // Call next renderer
+	return r.Next.Render(res, req)
 }
