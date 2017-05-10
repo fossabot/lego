@@ -47,7 +47,7 @@ func (c *Context) Redirect(url string) Renderer {
 
 // Data encodes an arbitrary type of data
 func (c *Context) Data(code int, contentType string, data io.ReadCloser) Renderer {
-	return &RenderData{ContentType: contentType, Reader: data}
+	return &RenderData{Code: code, ContentType: contentType, Reader: data}
 }
 
 // Conditional checks whether the request conditions are fresh.
