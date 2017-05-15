@@ -58,7 +58,7 @@ func mwDraining(next MiddlewareFunc) MiddlewareFunc {
 	}
 }
 
-// mwDraining blocks the request when the handler is draining
+// mwLogging logs information about HTTP requests/responses
 func mwLogging(next MiddlewareFunc) MiddlewareFunc {
 	return func(c *Context) {
 		c.Ctx.Trace("h.http.req.start", "Request start",
