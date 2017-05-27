@@ -4,12 +4,14 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stairlin/lego/ctx/journey"
 	lt "github.com/stairlin/lego/testing"
 )
 
 func TestBuildMiddlewares(t *testing.T) {
 	tt := lt.New(t)
 	factory := &mwFactory{t: tt}
+	appCtx := tt.NewAppCtx("test-middlewares")
 
 	l := []Middleware{
 		factory.newMiddleware(0),
@@ -20,7 +22,9 @@ func TestBuildMiddlewares(t *testing.T) {
 
 	c := buildMiddlewareChain(l, renderActionFunc(a.Call))
 
-	c(&Context{})
+	c(&Context{
+		Ctx: journey.New(appCtx),
+	})
 
 	expected := 3
 	if factory.C != expected {

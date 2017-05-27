@@ -30,8 +30,20 @@ func buildMiddlewareChain(l []Middleware, action MiddlewareFunc) MiddlewareFunc 
 
 func mwStartJourney(next MiddlewareFunc) MiddlewareFunc {
 	return func(c *Context) {
-		// Assign unique request ID
-		c.Ctx = journey.New(c.App)
+		header := c.Req.Header.Get("Ctx-Journey")
+		if c.App.Config().Request.PickupJourney && header != "" {
+			// Pick up journey where downstream left off
+			j, err := journey.ParseText(c.App, []byte(header))
+			if err != nil {
+				c.App.Warning("http.journey.parse.err", "Cannot parse journey", log.Error(err))
+				c.Res.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			c.Ctx = j
+		} else {
+			// Assign unique request ID
+			c.Ctx = journey.New(c.App)
+		}
 		next(c)
 		c.Ctx.End()
 	}
