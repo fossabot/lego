@@ -138,7 +138,6 @@ func TestTimeout(t *testing.T) {
 	app.Config().Request.TimeoutMS = 1
 
 	j := journey.New(app)
-
 	select {
 	case <-j.Done():
 		tt.Log("timeout released the context")
@@ -217,5 +216,26 @@ func TestBG_Cancellation(t *testing.T) {
 		tt.Error("expect to child context to be running")
 	default:
 		tt.Log("child context still running")
+	}
+}
+
+// TestJourney_TextMarshalling ensures that a journey can be serialised and then parsed in text format
+func TestJourney_TextMarshalling(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+	alpha := journey.New(app)
+
+	data, err := alpha.MarshalText()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	beta, err := journey.ParseText(app, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if beta.UUID() != alpha.UUID() {
+		t.Errorf("expect UUID %s, but got %s", beta.UUID(), alpha.UUID())
 	}
 }

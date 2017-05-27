@@ -3,9 +3,13 @@ package journey
 import (
 	"bytes"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
+
+const stepperSeparator = "_"
 
 // Stepper is the atomic counter for context log lines
 type Stepper struct {
@@ -21,6 +25,26 @@ func NewStepper() *Stepper {
 		Steps: []uint32{0},
 		I:     0,
 	}
+}
+
+// parseSteps parses a string representation of a stepper
+//
+// e.g. 100_23_40
+func parseSteps(s string) (*Stepper, error) {
+	values := strings.Split(s, stepperSeparator)
+	steps := make([]uint32, len(values))
+	for i, v := range values {
+		step, err := strconv.ParseUint(v, 10, 32)
+		if err != nil {
+			return nil, err
+		}
+		steps[i] = uint32(step)
+	}
+
+	return &Stepper{
+		Steps: steps,
+		I:     len(steps) - 1,
+	}, nil
 }
 
 // BranchOff returns a new "child" stepper
@@ -58,7 +82,7 @@ func (s *Stepper) String() string {
 
 		// Add separator
 		if i < s.I {
-			buf.WriteString("_")
+			buf.WriteString(stepperSeparator)
 		}
 	}
 

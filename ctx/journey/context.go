@@ -8,9 +8,11 @@ package journey
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 	netCtx "golang.org/x/net/context"
 
@@ -48,6 +50,9 @@ type Ctx interface {
 	Done() <-chan struct{}
 	Err() error
 	Value(key interface{}) interface{}
+
+	// Marshalling
+	MarshalText() (text []byte, err error)
 }
 
 // context holds the context of a request (journey) during its whole lifecycle
@@ -71,25 +76,41 @@ func New(ctx app.Ctx) Ctx {
 		log.String("id", id),
 	)
 
-	j := &context{
-		Type:    Root,
-		ID:      id,
-		Stepper: *NewStepper(),
-		Store:   newKV(),
-		app:     ctx,
-		logger:  ctx.L(),
+	c := build(ctx)
+	c.Type = Root
+	c.ID = id
+	c.Stepper = *NewStepper()
+	c.Store = newKV()
+	return c
+}
+
+// ParseText parses a context serialised in text format
+func ParseText(ctx app.Ctx, text []byte) (Ctx, error) {
+	c := build(ctx)
+
+	enc := newTextEncoder()
+	parts, err := enc.Decode(text)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot decode journey")
+	}
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("missing parts (%d)", len(parts))
 	}
 
-	// Build net context from its parent context
-	reqConfig := ctx.Config().Request
-	if reqConfig.Timeout() != 0 {
-		j.Trace("ctx.journey.deadline", "Set deadline", log.Time("deadline", time.Now().Add(reqConfig.Timeout())))
-		j.C, j.cancelFunc = netCtx.WithTimeout(ctx.RootContext(), ctx.Config().Request.Timeout())
-	} else {
-		j.C, j.cancelFunc = netCtx.WithCancel(ctx.RootContext())
+	t, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid journey type (%s)", parts[0])
+	}
+	stepper, err := parseSteps(parts[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid steps (%s)", parts[2])
 	}
 
-	return j
+	c.Type = Type(t)
+	c.ID = parts[1]
+	c.Stepper = *stepper
+	c.Store = newKV()
+	return c, nil
 }
 
 // AppConfig returns the application configuration on which this context currently runs
@@ -142,18 +163,21 @@ func (c *context) ShortID() string {
 	return strings.Split(c.ID, "-")[0]
 }
 
+// Trace level logs are to follow the code executio step by step
 func (c *context) Trace(tag, msg string, fields ...log.Field) {
 	c.incTag(tag)
 	c.log().Trace(tag, msg, c.logFields(fields)...)
 	c.incLogLevelCount(log.LevelTrace, tag)
 }
 
+// Warning level logs are meant to draw attention above a certain threshold
 func (c *context) Warning(tag, msg string, fields ...log.Field) {
 	c.incTag(tag)
 	c.log().Warning(tag, msg, c.logFields(fields)...)
 	c.incLogLevelCount(log.LevelWarning, tag)
 }
 
+// Error level logs need immediate attention
 func (c *context) Error(tag, msg string, fields ...log.Field) {
 	c.incTag(tag)
 	c.log().Error(tag, msg, c.logFields(fields)...)
@@ -193,6 +217,15 @@ func (c *context) Err() error { return c.C.Err() }
 func (c *context) Value(key interface{}) interface{} {
 	c.Trace("ctx.journey.value", "Add net context value", log.Object("value", key))
 	return c.C.Value(key)
+}
+
+func (c context) MarshalText() (text []byte, err error) {
+	enc := newTextEncoder()
+	return enc.Encode(
+		strconv.Itoa(int(c.Type)),
+		c.ID,
+		c.Stepper.String(),
+	), nil
 }
 
 func (c *context) logFields(fields []log.Field) []log.Field {
@@ -272,4 +305,19 @@ func spaceOut(args ...interface{}) string {
 		l[i] = fmt.Sprint(a)
 	}
 	return strings.Join(l, " ")
+}
+
+func build(ctx app.Ctx) *context {
+	c := &context{
+		app:    ctx,
+		logger: ctx.L(),
+	}
+
+	reqConfig := c.app.Config().Request
+	if reqConfig.Timeout() != 0 {
+		c.C, c.cancelFunc = netCtx.WithTimeout(c.app.RootContext(), reqConfig.Timeout())
+	} else {
+		c.C, c.cancelFunc = netCtx.WithCancel(c.app.RootContext())
+	}
+	return c
 }

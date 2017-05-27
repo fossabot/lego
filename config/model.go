@@ -36,7 +36,8 @@ type Stats struct {
 
 // Request defines the request default configuration
 type Request struct {
-	TimeoutMS time.Duration `json:"timeout_ms"`
+	TimeoutMS     time.Duration `json:"timeout_ms"`
+	PickupJourney bool          `json:"pickup_journey"`
 }
 
 // Timeout returns the TimeoutMS field in time.Duration
