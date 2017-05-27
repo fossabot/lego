@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 	netCtx "golang.org/x/net/context"
 
@@ -87,10 +88,15 @@ func New(ctx app.Ctx) Ctx {
 func ParseText(ctx app.Ctx, text []byte) (Ctx, error) {
 	c := build(ctx)
 
-	parts := strings.Split(string(text), ":")
+	enc := newTextEncoder()
+	parts, err := enc.Decode(text)
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot decode journey")
+	}
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("missing parts (%d)", len(parts))
 	}
+
 	t, err := strconv.Atoi(parts[0])
 	if err != nil {
 		return nil, fmt.Errorf("invalid journey type (%s)", parts[0])
@@ -214,13 +220,12 @@ func (c *context) Value(key interface{}) interface{} {
 }
 
 func (c context) MarshalText() (text []byte, err error) {
-	return []byte(strings.Join(
-		[]string{
-			strconv.Itoa(int(c.Type)),
-			c.ID,
-			c.Stepper.String(),
-		}, ":",
-	)), nil
+	enc := newTextEncoder()
+	return enc.Encode(
+		strconv.Itoa(int(c.Type)),
+		c.ID,
+		c.Stepper.String(),
+	), nil
 }
 
 func (c *context) logFields(fields []log.Field) []log.Field {
