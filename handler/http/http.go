@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/log"
 )
 
@@ -30,7 +31,6 @@ func NewHandler() *Handler {
 	h := &Handler{}
 
 	// Register required middlewares
-	h.Append(mwStartJourney)
 	h.Append(mwDebug)
 	h.Append(mwDraining)
 	h.Append(mwStats)
@@ -153,7 +153,6 @@ func (h *bareHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	res := Response{http: w}
 	c := Context{
 		App:       h.app,
-		Ctx:       nil,
 		StartTime: time.Now(),
 		Params:    mux.Vars(r),
 		Method:    h.method,
@@ -165,6 +164,23 @@ func (h *bareHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		action:     h.a,
 	}
 
+	// Start or continue journey
+	header := c.Req.Header.Get("Ctx-Journey")
+	if c.App.Config().Request.PickupJourney && header != "" {
+		// Pick up journey where downstream left off
+		j, err := journey.ParseText(c.App, []byte(header))
+		if err != nil {
+			c.App.Warning("http.journey.parse.err", "Cannot parse journey", log.Error(err))
+			c.Res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		c.Ctx = j
+	} else {
+		// Assign unique request ID
+		c.Ctx = journey.New(c.App)
+	}
+
 	// Start call chain
 	h.call(&c)
+	c.Ctx.End()
 }

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/log"
 )
 
@@ -26,27 +25,6 @@ func buildMiddlewareChain(l []Middleware, action MiddlewareFunc) MiddlewareFunc 
 		c = l[i](c)
 	}
 	return c
-}
-
-func mwStartJourney(next MiddlewareFunc) MiddlewareFunc {
-	return func(c *Context) {
-		header := c.Req.Header.Get("Ctx-Journey")
-		if c.App.Config().Request.PickupJourney && header != "" {
-			// Pick up journey where downstream left off
-			j, err := journey.ParseText(c.App, []byte(header))
-			if err != nil {
-				c.App.Warning("http.journey.parse.err", "Cannot parse journey", log.Error(err))
-				c.Res.WriteHeader(http.StatusBadRequest)
-				return
-			}
-			c.Ctx = j
-		} else {
-			// Assign unique request ID
-			c.Ctx = journey.New(c.App)
-		}
-		next(c)
-		c.Ctx.End()
-	}
 }
 
 // mwDebug adds useful debugging information to the response header
