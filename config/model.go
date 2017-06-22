@@ -38,6 +38,7 @@ type Stats struct {
 type Request struct {
 	TimeoutMS     time.Duration `json:"timeout_ms"`
 	PickupJourney bool          `json:"pickup_journey"`
+	Panic         bool          `json:"panic"`
 }
 
 // Timeout returns the TimeoutMS field in time.Duration

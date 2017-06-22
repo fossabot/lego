@@ -90,6 +90,9 @@ func mwPanic(next MiddlewareFunc) MiddlewareFunc {
 		// Wrap call to the next middleware
 		func() {
 			defer func() {
+				if c.App.Config().Request.Panic {
+					return
+				}
 				if recover := recover(); recover != nil {
 					c.Res.WriteHeader(http.StatusInternalServerError)
 					c.Ctx.Error("http.mw.panic", "Recovered from panic",
