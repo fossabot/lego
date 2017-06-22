@@ -53,7 +53,6 @@ func mwStartJourney(next MiddlewareFunc) MiddlewareFunc {
 func mwDebug(next MiddlewareFunc) MiddlewareFunc {
 	return func(c *Context) {
 		c.Res.Header().Add("Request-Id", c.Ctx.UUID())
-		c.Res.Header().Add("Request-Duration", time.Since(c.StartTime).String())
 		next(c)
 	}
 }
