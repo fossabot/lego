@@ -35,7 +35,6 @@ func NewHandler() *Handler {
 	h.Append(mwDraining)
 	h.Append(mwStats)
 	h.Append(mwLogging)
-	h.Append(mwInterrupt)
 	h.Append(mwPanic)
 
 	return h

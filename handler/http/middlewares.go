@@ -106,24 +106,6 @@ func mwStats(next MiddlewareFunc) MiddlewareFunc {
 	}
 }
 
-// mwInterrupt returns the request when the context deadline expires or is being cancelled
-func mwInterrupt(next MiddlewareFunc) MiddlewareFunc {
-	return func(c *Context) {
-		res := make(chan struct{}, 1)
-		go func() {
-			next(c)
-			res <- struct{}{}
-		}()
-
-		select {
-		case <-res:
-		case <-c.Ctx.Done():
-			c.Ctx.Trace("http.mw.interrupt", "Request cancelled or timed out", log.Error(c.Ctx.Err()))
-			c.Res.WriteHeader(http.StatusGatewayTimeout)
-		}
-	}
-}
-
 // mwPanic catches panic and recover
 func mwPanic(next MiddlewareFunc) MiddlewareFunc {
 	return func(c *Context) {
