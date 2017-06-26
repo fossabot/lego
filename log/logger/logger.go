@@ -23,7 +23,13 @@ func New(service string, config *config.Log) (log.Logger, error) {
 		return nil, err
 	}
 
-	return &Logger{service: service, fmt: f, pnt: p, calldepth: 1}, nil
+	return &Logger{
+		service:   service,
+		level:     log.ParseLevel(config.Level),
+		fmt:       f,
+		pnt:       p,
+		calldepth: 1,
+	}, nil
 }
 
 // Logger is the key struct of the log package.

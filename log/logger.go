@@ -5,6 +5,19 @@ import "fmt"
 // Level defines log severity
 type Level int
 
+// ParseLevel parses a string representation of a log level
+func ParseLevel(s string) Level {
+	switch s {
+	case "trace":
+		return LevelTrace
+	case "warning":
+		return LevelWarning
+	case "error":
+		return LevelError
+	}
+	return LevelTrace
+}
+
 const (
 	// LevelTrace displays logs with trace level (and above)
 	LevelTrace Level = iota
