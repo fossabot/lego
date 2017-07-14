@@ -23,6 +23,7 @@ func TestBuildMiddlewares(t *testing.T) {
 	c := buildMiddlewareChain(l, renderActionFunc(a.Call))
 
 	c(&Context{
+		App: appCtx,
 		Ctx: journey.New(appCtx),
 	})
 

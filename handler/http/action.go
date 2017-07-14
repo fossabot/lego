@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"runtime/debug"
 
 	"github.com/stairlin/lego/log"
 )
@@ -19,7 +20,22 @@ type ActionFunc func(c *Context) Renderer
 func renderActionFunc(f ActionFunc) MiddlewareFunc {
 	return func(c *Context) {
 		res := make(chan Renderer, 1)
+		rec := make(chan interface{}, 1)
+
 		go func() {
+			defer func() {
+				if c.App.Config().Request.Panic {
+					return
+				}
+				if recover := recover(); recover != nil {
+					c.Ctx.Error("http.panic", "Recovered from panic",
+						log.Object("err", recover),
+						log.String("stack", string(debug.Stack())),
+					)
+					rec <- recover
+				}
+			}()
+
 			res <- f(c)
 		}()
 
@@ -29,6 +45,8 @@ func renderActionFunc(f ActionFunc) MiddlewareFunc {
 				c.Ctx.Error("http.render", "Renderer error", log.Error(err))
 				c.Res.WriteHeader(http.StatusInternalServerError)
 			}
+		case <-rec:
+			c.Res.WriteHeader(http.StatusInternalServerError)
 		case <-c.Ctx.Done():
 			c.Ctx.Trace("http.interrupt", "Request cancelled or timed out", log.Error(c.Ctx.Err()))
 			c.Res.WriteHeader(http.StatusGatewayTimeout)
