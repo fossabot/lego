@@ -1,6 +1,9 @@
 package journey_test
 
 import (
+	"bytes"
+	"encoding/gob"
+	"reflect"
 	"testing"
 
 	"github.com/stairlin/lego/ctx/journey"
@@ -64,4 +67,36 @@ func TestString(t *testing.T) {
 		}
 	}
 
+}
+
+func TestStepper_Marshal(t *testing.T) {
+	s := journey.NewStepper()
+	s.Inc()
+	s.Inc()
+
+	s = s.BranchOff()
+	s.Inc()
+
+	expect := *s             // Copy stepper
+	var network bytes.Buffer // Stand-in for the network.
+
+	// Create an encoder and send a value.
+	enc := gob.NewEncoder(&network)
+	if err := enc.Encode(s); err != nil {
+		t.Fatal("encode:", err)
+	}
+
+	// Create a decoder and receive a value.
+	s = &journey.Stepper{}
+	dec := gob.NewDecoder(&network)
+	if err := dec.Decode(s); err != nil {
+		t.Fatal("encode:", err)
+	}
+
+	if expect.I != s.I {
+		t.Errorf("expect I %d, but got %d", expect.I, s.I)
+	}
+	if !reflect.DeepEqual(expect.Steps, s.Steps) {
+		t.Errorf("expect I %v, but got %v", expect.Steps, s.Steps)
+	}
 }

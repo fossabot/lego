@@ -1,12 +1,12 @@
-hash: c24467aa7141cd2a09012d7bd20ef1b2a49bedac47f2c91eb917652cda5f6b4a
-updated: 2017-03-23T14:51:30.059491626+01:00
+hash: 034cc09ef2810595033d329edae21ec05c03638a1c37602a94d207a2f34dedd8
+updated: 2017-08-26T21:39:50.216488824+02:00
 imports:
 - name: github.com/fatih/color
-  version: 9131ab34cf20d2f6d83fdc67168a5430d1c7dc23
+  version: 570b54cabe6b8eb0bc2dfce68d964677d63b5260
 - name: github.com/gorilla/context
   version: 08b5f424b9271eedf6f9f0ce86cb9396ed337a42
 - name: github.com/gorilla/mux
-  version: 392c28fe23e1c45ddba891b0320b3b5df220beea
+  version: bcd8bc72b08df0f70df986b97f95590779502d31
 - name: github.com/hashicorp/consul
   version: 00a5fc2947c649eab81447cd6badf4c29fad9fa6
   subpackages:
@@ -24,7 +24,7 @@ imports:
   version: 57fdcb988a5c543893cc61bce354a6e24ab70022
   repo: https://github.com/mattn/go-isatty
 - name: github.com/pkg/errors
-  version: ff09b135c25aae272398c51a07235b90a75aa4f0
+  version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/satori/go.uuid
   version: 879c5887cd475cd7864858769793b2ceb0d44feb
 - name: golang.org/x/net

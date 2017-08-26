@@ -8,11 +8,9 @@ package journey
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/satori/go.uuid"
 	netCtx "golang.org/x/net/context"
 
@@ -35,36 +33,29 @@ const (
 // Ctx is the journey context interface
 type Ctx interface {
 	ctx.Ctx
+	netCtx.Context
 
 	UUID() string
 	ShortID() string
 	AppConfig() *config.Config
 	BG(f func(c Ctx)) error
-	KV() KV
+	KV() *KV
 	BranchOff(t Type) Ctx
 	Cancel()
 	End()
-
-	// Net context functions
-	Deadline() (deadline time.Time, ok bool)
-	Done() <-chan struct{}
-	Err() error
-	Value(key interface{}) interface{}
-
-	// Marshalling
-	MarshalText() (text []byte, err error)
 }
 
 // context holds the context of a request (journey) during its whole lifecycle
 type context struct {
-	Type       Type
-	ID         string // (hopefully) globally unique identifier
-	C          netCtx.Context
-	Stepper    Stepper
-	Store      KV
 	app        app.Ctx
 	logger     log.Logger
+	net        netCtx.Context
 	cancelFunc func()
+
+	Type    Type
+	ID      string // (hopefully) globally unique identifier
+	Stepper *Stepper
+	Store   *KV
 }
 
 // New creates a new context and returns it
@@ -79,38 +70,9 @@ func New(ctx app.Ctx) Ctx {
 	c := build(ctx)
 	c.Type = Root
 	c.ID = id
-	c.Stepper = *NewStepper()
-	c.Store = newKV()
+	c.Stepper = NewStepper()
+	c.Store = NewKV()
 	return c
-}
-
-// ParseText parses a context serialised in text format
-func ParseText(ctx app.Ctx, text []byte) (Ctx, error) {
-	c := build(ctx)
-
-	enc := newTextEncoder()
-	parts, err := enc.Decode(text)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot decode journey")
-	}
-	if len(parts) != 3 {
-		return nil, fmt.Errorf("missing parts (%d)", len(parts))
-	}
-
-	t, err := strconv.Atoi(parts[0])
-	if err != nil {
-		return nil, fmt.Errorf("invalid journey type (%s)", parts[0])
-	}
-	stepper, err := parseSteps(parts[2])
-	if err != nil {
-		return nil, fmt.Errorf("invalid steps (%s)", parts[2])
-	}
-
-	c.Type = Type(t)
-	c.ID = parts[1]
-	c.Stepper = *stepper
-	c.Store = newKV()
-	return c, nil
 }
 
 // AppConfig returns the application configuration on which this context currently runs
@@ -184,7 +146,7 @@ func (c *context) Error(tag, msg string, fields ...log.Field) {
 	c.incLogLevelCount(log.LevelError, tag)
 }
 
-func (c *context) KV() KV {
+func (c *context) KV() *KV {
 	return c.Store
 }
 
@@ -194,18 +156,18 @@ func (c *context) KV() KV {
 // Deadline returns the time when work done on behalf of this context
 // should be canceled. Deadline returns ok==false when no deadline is
 // set. Successive calls to Deadline return the same results.
-func (c *context) Deadline() (deadline time.Time, ok bool) { return c.C.Deadline() }
+func (c *context) Deadline() (deadline time.Time, ok bool) { return c.net.Deadline() }
 
 // Done returns a channel that's closed when work done on behalf of this
 // context should be canceled. Done may return nil if this context can
 // never be canceled. Successive calls to Done return the same value.
-func (c *context) Done() <-chan struct{} { return c.C.Done() }
+func (c *context) Done() <-chan struct{} { return c.net.Done() }
 
 // Err returns a non-nil error value after Done is closed. Err returns
 // Canceled if the context was canceled or DeadlineExceeded if the
 // context's deadline passed. No other values for Err are defined.
 // After Done is closed, successive calls to Err return the same value.
-func (c *context) Err() error { return c.C.Err() }
+func (c *context) Err() error { return c.net.Err() }
 
 // Value returns the value associated with this context for key, or nil
 // if no value is associated with key. Successive calls to Value with
@@ -216,16 +178,7 @@ func (c *context) Err() error { return c.C.Err() }
 // functions.
 func (c *context) Value(key interface{}) interface{} {
 	c.Trace("ctx.journey.value", "Add net context value", log.Object("value", key))
-	return c.C.Value(key)
-}
-
-func (c context) MarshalText() (text []byte, err error) {
-	enc := newTextEncoder()
-	return enc.Encode(
-		strconv.Itoa(int(c.Type)),
-		c.ID,
-		c.Stepper.String(),
-	), nil
+	return c.net.Value(key)
 }
 
 func (c *context) logFields(fields []log.Field) []log.Field {
@@ -274,15 +227,15 @@ func (c *context) BranchOff(t Type) Ctx {
 
 	// If we have a root context, we break the context cancellation propagation
 	if t == Root {
-		ctx.C = netCtx.Background()
+		ctx.net = netCtx.Background()
 		return ctx
 	}
 
 	// Otherwise, create a new net context from its parent
-	if deadline, ok := c.C.Deadline(); ok {
-		ctx.C, ctx.cancelFunc = netCtx.WithDeadline(c.C, deadline)
+	if deadline, ok := c.net.Deadline(); ok {
+		ctx.net, ctx.cancelFunc = netCtx.WithDeadline(c.net, deadline)
 	} else {
-		ctx.C, ctx.cancelFunc = netCtx.WithCancel(c.C)
+		ctx.net, ctx.cancelFunc = netCtx.WithCancel(c.net)
 	}
 	return ctx
 }
@@ -290,8 +243,8 @@ func (c *context) BranchOff(t Type) Ctx {
 func (c *context) createSubCtx() *context {
 	return &context{
 		ID:         c.ID,
-		Stepper:    *c.Stepper.BranchOff(),
-		C:          nil,
+		Stepper:    c.Stepper.BranchOff(),
+		net:        nil,
 		app:        c.app,
 		logger:     c.logger,
 		cancelFunc: func() {},
@@ -315,9 +268,9 @@ func build(ctx app.Ctx) *context {
 
 	reqConfig := c.app.Config().Request
 	if reqConfig.Timeout() != 0 {
-		c.C, c.cancelFunc = netCtx.WithTimeout(c.app.RootContext(), reqConfig.Timeout())
+		c.net, c.cancelFunc = netCtx.WithTimeout(c.app.RootContext(), reqConfig.Timeout())
 	} else {
-		c.C, c.cancelFunc = netCtx.WithCancel(c.app.RootContext())
+		c.net, c.cancelFunc = netCtx.WithCancel(c.app.RootContext())
 	}
 	return c
 }

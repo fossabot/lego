@@ -219,23 +219,48 @@ func TestBG_Cancellation(t *testing.T) {
 	}
 }
 
-// TestJourney_TextMarshalling ensures that a journey can be serialised and then parsed in text format
-func TestJourney_TextMarshalling(t *testing.T) {
+func TestJourney_Marshalling(t *testing.T) {
 	tt := lt.New(t)
 	app := tt.NewAppCtx("journey-test")
-	alpha := journey.New(app)
+	ctx := journey.New(app)
 
-	data, err := alpha.MarshalText()
+	// Create an encoder and send a value.
+	data, err := journey.MarshalGob(ctx)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("Marshal:", err)
 	}
 
-	beta, err := journey.ParseText(app, data)
+	// Decode value
+	ctx, err = journey.UnmarshalGob(app, data)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("Unmarshal:", err)
+	}
+}
+
+func TestJourney_MarshallingKV(t *testing.T) {
+	tt := lt.New(t)
+	app := tt.NewAppCtx("journey-test")
+	ctx := journey.New(app)
+
+	ctx.KV().Store("foo", "bar")
+
+	// Create an encoder and send a value.
+	data, err := journey.MarshalGob(ctx)
+	if err != nil {
+		t.Fatal("Marshal:", err)
 	}
 
-	if beta.UUID() != alpha.UUID() {
-		t.Errorf("expect UUID %s, but got %s", beta.UUID(), alpha.UUID())
+	// Decode value
+	ctx, err = journey.UnmarshalGob(app, data)
+	if err != nil {
+		t.Fatal("Unmarshal:", err)
+	}
+
+	v, ok := ctx.KV().Load("foo")
+	if !ok {
+		t.Fatal("expect kv to have key foo")
+	}
+	if v != "bar" {
+		t.Fatalf("expect value bar, but got %s", v)
 	}
 }

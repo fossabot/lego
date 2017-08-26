@@ -164,11 +164,10 @@ func (h *bareHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		action:     h.a,
 	}
 
-	// Start or continue journey
-	header := c.Req.Header.Get("Ctx-Journey")
-	if c.App.Config().Request.PickupJourney && header != "" {
+	// Start or pick up journey
+	if c.App.Config().Request.AllowContext && HasContext(c.Req) {
 		// Pick up journey where downstream left off
-		j, err := journey.ParseText(c.App, []byte(header))
+		j, err := UnmarshalContext(c.App, c.Req)
 		if err != nil {
 			c.App.Warning("http.journey.parse.err", "Cannot parse journey", log.Error(err))
 			c.Res.WriteHeader(http.StatusBadRequest)
