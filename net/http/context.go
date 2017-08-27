@@ -1,10 +1,9 @@
 package http
 
 import (
+	"io"
 	"net/http"
 	"time"
-
-	"io"
 
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"

@@ -1,4 +1,4 @@
-package handler
+package net
 
 import (
 	"errors"
@@ -12,8 +12,8 @@ import (
 // ErrEmptyReg is the error returned when there are no handlers registered
 var ErrEmptyReg = errors.New("there must be at least one registered handler")
 
-// H is the interface to implement to be a valid handler
-type H interface {
+// Handler is the interface to implement to be a valid handler
+type Handler interface {
 	Serve(addr string, ctx app.Ctx) error
 	Drain()
 }
@@ -23,7 +23,7 @@ type Reg struct {
 	mu sync.Mutex
 
 	ctx   app.Ctx
-	l     map[string]H
+	l     map[string]Handler
 	drain bool
 }
 
@@ -31,12 +31,12 @@ type Reg struct {
 func NewReg(ctx app.Ctx) *Reg {
 	return &Reg{
 		ctx: ctx,
-		l:   map[string]H{},
+		l:   map[string]Handler{},
 	}
 }
 
 // Add adds the given handler to the list of handlers
-func (r *Reg) Add(addr string, h H) {
+func (r *Reg) Add(addr string, h Handler) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -63,7 +63,7 @@ func (r *Reg) Serve() error {
 	wg := sync.WaitGroup{}
 	wg.Add(len(r.l))
 	for addr, h := range r.l {
-		go func(addr string, h H) {
+		go func(addr string, h Handler) {
 			// Deregister itself upon completion
 			defer func() {
 				r.ctx.Trace("lego.serve.h.stop", "Handler has stopped running",
@@ -123,7 +123,7 @@ func (r *Reg) Drain() {
 		r.ctx.Trace("handler.drain.h", "Drain handler",
 			log.Type("handler", h),
 		)
-		go func(h H) {
+		go func(h Handler) {
 			h.Drain()
 			wg.Done()
 		}(h)
@@ -135,7 +135,7 @@ func (r *Reg) Drain() {
 	r.ctx.Trace("handler.drain.done", "All handlers have been drained")
 }
 
-func (r *Reg) register(addr string, h H) error {
+func (r *Reg) register(addr string, h Handler) error {
 	if _, ok := r.l[addr]; ok {
 		return fmt.Errorf(
 			"handler listening on <%s> has already been registered (%T)",

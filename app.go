@@ -7,9 +7,9 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/stairlin/lego/net"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx/app"
-	"github.com/stairlin/lego/handler"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/log/logger"
 	statsAdapter "github.com/stairlin/lego/stats/adapter"
@@ -23,7 +23,7 @@ type App struct {
 	service  string
 	ctx      app.Ctx
 	config   *config.Config
-	handlers *handler.Reg
+	handlers *net.Reg
 	drain    bool
 	done     chan bool
 }
@@ -79,7 +79,7 @@ func NewWithConfig(service string, c *config.Config) (*App, error) {
 		ready:    ready,
 		ctx:      ctx,
 		config:   c,
-		handlers: handler.NewReg(ctx),
+		handlers: net.NewReg(ctx),
 		done:     make(chan bool, 1),
 	}
 

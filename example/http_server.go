@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/stairlin/lego"
-	"github.com/stairlin/lego/handler/http"
+	"github.com/stairlin/lego/net/http"
 	"github.com/stairlin/lego/log"
 )
 

@@ -244,6 +244,7 @@ func (c *context) createSubCtx() *context {
 	return &context{
 		ID:         c.ID,
 		Stepper:    c.Stepper.BranchOff(),
+		Store:      c.Store,
 		net:        nil,
 		app:        c.app,
 		logger:     c.logger,

@@ -1,12 +1,12 @@
-package handler_test
+package net_test
 
 import (
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stairlin/lego/net"
 	"github.com/stairlin/lego/ctx/app"
-	"github.com/stairlin/lego/handler"
 	lt "github.com/stairlin/lego/testing"
 )
 
@@ -14,7 +14,7 @@ import (
 // address can be registered once and only once
 func TestHandlerRegistration(t *testing.T) {
 	tt := lt.New(t)
-	reg := handler.NewReg(tt.NewAppCtx("handler-test"))
+	reg := net.NewReg(tt.NewAppCtx("handler-test"))
 	addr := "localhost:8080"
 	h := NewDummyH()
 
@@ -38,7 +38,7 @@ func TestHandlerRegistration(t *testing.T) {
 func TestServe(t *testing.T) {
 	tt := lt.New(t)
 	ctx := tt.NewAppCtx("handler-test")
-	reg := handler.NewReg(ctx)
+	reg := net.NewReg(ctx)
 
 	l := []struct {
 		h    *dummyH
@@ -78,9 +78,9 @@ func TestServe(t *testing.T) {
 func TestServeEmptyRegistry(t *testing.T) {
 	tt := lt.New(t)
 	ctx := tt.NewAppCtx("handler-test")
-	reg := handler.NewReg(ctx)
+	reg := net.NewReg(ctx)
 
-	if err := reg.Serve(); err != handler.ErrEmptyReg {
+	if err := reg.Serve(); err != net.ErrEmptyReg {
 		t.Error("expect Serve to return an error when the registry is empty", err)
 	}
 }
@@ -89,7 +89,7 @@ func TestServeEmptyRegistry(t *testing.T) {
 func TestDrain(t *testing.T) {
 	tt := lt.New(t)
 	ctx := tt.NewAppCtx("handler-test")
-	reg := handler.NewReg(ctx)
+	reg := net.NewReg(ctx)
 
 	l := []struct {
 		h    *dummyH
