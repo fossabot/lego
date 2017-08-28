@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -12,11 +13,21 @@ import (
 	"github.com/stairlin/lego/log"
 )
 
+const (
+	// down mode is the default state. The handler is not ready to accept
+	// new connections
+	down uint32 = 0
+	// up mode is when a handler accepts connections
+	up uint32 = 1
+	// drain mode is when a handler stops accepting new connection, but wait
+	// for all existing in-flight requests to complete
+	drain uint32 = 2
+)
+
 // Handler is a lego handler for the HTTP protocol
 type Handler struct {
-	mu    sync.Mutex
-	wg    sync.WaitGroup
-	drain bool
+	wg   sync.WaitGroup
+	mode uint32
 
 	routes      []Route
 	middlewares []Middleware
@@ -102,6 +113,7 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 	}
 
 	ctx.Trace("h.http.listen", "Listening...", log.String("addr", addr))
+	atomic.StoreUint32(&h.mode, up)
 	return http.ListenAndServe(addr, r)
 }
 
@@ -109,18 +121,14 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 // blocked with a 503 and it will block this call until all in-flight requests
 // have been completed
 func (h *Handler) Drain() {
-	h.mu.Lock()
-	h.drain = true // Block all new requests
-	h.mu.Unlock()
-
+	atomic.StoreUint32(&h.mode, drain)
 	h.wg.Wait() // Wait for all in-flight requests to complete
+	atomic.StoreUint32(&h.mode, down)
 }
 
 // isDraining checks whether the handler is draining
 func (h *Handler) isDraining() bool {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.drain
+	return atomic.LoadUint32(&h.mode) == drain
 }
 
 // add signals a new inbound request
