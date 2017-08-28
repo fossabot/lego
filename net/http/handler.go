@@ -1,6 +1,7 @@
 package http
 
 import (
+	"crypto/tls"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -35,6 +36,10 @@ type Handler struct {
 		Path string
 		Dir  string
 	}
+
+	certFile  string
+	keyFile   string
+	tlsConfig *tls.Config
 }
 
 // NewHandler creates a new metal handler
@@ -58,12 +63,11 @@ func (h *Handler) Handle(path, method string, a Action) {
 
 // HandleFunc registers a new function as an action on the given path and method
 func (h *Handler) HandleFunc(path, method string, f ActionFunc) {
-	r := Route{
+	h.routes = append(h.routes, Route{
 		Path:   path,
 		Method: method,
 		Action: f,
-	}
-	h.routes = append(h.routes, r)
+	})
 }
 
 // Append appends the given middleware to the call chain
@@ -76,6 +80,20 @@ func (h *Handler) Append(m Middleware) {
 func (h *Handler) Static(path, dir string) {
 	h.static.Path = path
 	h.static.Dir = dir
+}
+
+// SetTLS sets a certificate and private key to the handler. If the handler
+// has a certificate, it will accept only incoming HTTPS connections.
+//
+// If the certificate is signed by a certificate authority, the certFile should
+// be the concatenation of the server's certificate, any intermediates,
+// and the CA's certificate.
+func (h *Handler) SetTLS(certFile, keyFile string, config ...*tls.Config) {
+	h.certFile = certFile
+	h.keyFile = keyFile
+	if len(config) > 0 {
+		h.tlsConfig = config[0]
+	}
 }
 
 // Serve starts serving HTTP requests (blocking call)
@@ -112,9 +130,19 @@ func (h *Handler) Serve(addr string, ctx app.Ctx) error {
 		r.PathPrefix(h.static.Path).Handler(http.StripPrefix(h.static.Path, &sh))
 	}
 
-	ctx.Trace("h.http.listen", "Listening...", log.String("addr", addr))
+	srv := &http.Server{
+		Addr:      addr,
+		Handler:   r,
+		TLSConfig: h.tlsConfig,
+	}
+
+	tlsEnabled := h.certFile != "" && h.keyFile != ""
+	ctx.Trace("h.http.listen", "Listening...", log.String("addr", addr), log.Bool("tls", tlsEnabled))
 	atomic.StoreUint32(&h.mode, up)
-	return http.ListenAndServe(addr, r)
+	if tlsEnabled {
+		return srv.ListenAndServeTLS(h.certFile, h.keyFile)
+	}
+	return srv.ListenAndServe()
 }
 
 // Drain puts the handler into drain mode. All new requests will be
