@@ -5,8 +5,9 @@ import (
 	"os"
 
 	"github.com/stairlin/lego"
-	"github.com/stairlin/lego/net/http"
+	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/log"
+	"github.com/stairlin/lego/net/http"
 )
 
 type AppConfig struct {
@@ -36,7 +37,7 @@ func main() {
 }
 
 // Ping handler example
-func Ping(c *http.Context) http.Renderer {
-	c.Ctx.Trace("action.ping", "Simple request", log.Time("start_time", c.StartTime))
-	return c.Head(http.StatusOK)
+func Ping(ctx journey.Ctx, w http.ResponseWriter, r *http.Request) {
+	ctx.Trace("action.ping", "Simple request", log.String("ua", r.HTTP.UserAgent()))
+	w.Head(http.StatusOK)
 }
