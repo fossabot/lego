@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -24,13 +25,13 @@ const (
 	drain uint32 = 2
 )
 
-// Handler is a lego handler for the HTTP protocol
-// TODO: Rename server
-type Handler struct {
+// A Server defines parameters for running a lego compatible HTTP server
+// The zero value for Server is a valid configuration.
+type Server struct {
 	wg   sync.WaitGroup
 	mode uint32
 
-	server http.Server
+	http http.Server
 
 	endpoints   []Endpoint
 	middlewares []Middleware
@@ -39,48 +40,56 @@ type Handler struct {
 	keyFile  string
 }
 
-// NewHandler creates a new metal handler
-func NewHandler() *Handler {
-	h := &Handler{}
-
-	// Register required middlewares
-	h.Append(mwDebug)
-	h.Append(mwStats)
-	h.Append(mwLogging)
-	h.Append(mwPanic)
-
-	return h
+// NewServer creates a new server and attaches the default middlewares
+func NewServer() *Server {
+	s := &Server{}
+	s.Append(mwDebug)
+	s.Append(mwStats)
+	s.Append(mwLogging)
+	s.Append(mwPanic)
+	s.Append(mwInterrupt)
+	return s
 }
 
 // HandleFunc registers a new function as an action on the given path and method
-func (h *Handler) HandleFunc(path, method string,
+func (s *Server) HandleFunc(
+	path,
+	method string,
 	f func(ctx journey.Ctx, w ResponseWriter, r *Request),
 ) {
-	h.HandleEndpoint(&actionEndpoint{
-		path:   path,
-		method: method,
-		call:   buildMiddlewareChain(h.middlewares, renderActionFunc(f)),
+	s.HandleEndpoint(&stdEndpoint{
+		path:       path,
+		method:     method,
+		handleFunc: f,
 	})
 }
 
 // HandleStatic registers a new route on the given path with path prefix
 // to serve static files from the provided root directory
-func (h *Handler) HandleStatic(path, dir string) {
-	h.HandleEndpoint(&fileEndpoint{
-		path: path,
-		fs:   &fileHandler{root: http.Dir(dir)},
-	})
+func (s *Server) HandleStatic(
+	path,
+	root string,
+	hook ...func(ctx journey.Ctx, w ResponseWriter, r *Request, serveFile func()),
+) {
+	e := &fileEndpoint{
+		path:        path,
+		fileHandler: &fileHandler{root: http.Dir(root)},
+	}
+	if len(hook) > 0 {
+		e.hook = hook[0]
+	}
+	s.HandleEndpoint(e)
 }
 
 // HandleEndpoint registers an endpoint.
 // This is particularily useful for custom endpoint types
-func (h *Handler) HandleEndpoint(e Endpoint) {
-	h.endpoints = append(h.endpoints, e)
+func (s *Server) HandleEndpoint(e Endpoint) {
+	s.endpoints = append(s.endpoints, e)
 }
 
 // Append appends the given middleware to the call chain
-func (h *Handler) Append(m Middleware) {
-	h.middlewares = append(h.middlewares, m)
+func (s *Server) Append(m Middleware) {
+	s.middlewares = append(s.middlewares, m)
 }
 
 // ActivateTLS activates TLS on this handler. That means only incoming HTTPS
@@ -89,63 +98,73 @@ func (h *Handler) Append(m Middleware) {
 // If the certificate is signed by a certificate authority, the certFile should
 // be the concatenation of the server's certificate, any intermediates,
 // and the CA's certificate.
-func (h *Handler) ActivateTLS(certFile, keyFile string) {
-	h.certFile = certFile
-	h.keyFile = keyFile
+func (s *Server) ActivateTLS(certFile, keyFile string) {
+	s.certFile = certFile
+	s.keyFile = keyFile
 }
 
 // SetOptions changes the handler options
-func (h *Handler) SetOptions(opts ...Option) {
+func (s *Server) SetOptions(opts ...Option) {
 	for _, opt := range opts {
-		opt(h)
+		opt(s)
 	}
 }
 
 // Serve starts serving HTTP requests (blocking call)
-func (h *Handler) Serve(addr string, ctx app.Ctx) error {
+func (s *Server) Serve(addr string, ctx app.Ctx) error {
 	r := mux.NewRouter()
-	for _, e := range h.endpoints {
-		e.Attach(r, h.buildHandleFunc(ctx, e))
+	for _, e := range s.endpoints {
+		e.Attach(r, s.buildHandleFunc(ctx, e))
 	}
 
-	h.server.Addr = addr
-	h.server.Handler = r
+	s.http.Addr = addr
+	s.http.Handler = r
 
-	tlsEnabled := h.certFile != "" && h.keyFile != ""
-	ctx.Trace("h.http.listen", "Listening...", log.String("addr", addr),
+	tlsEnabled := s.certFile != "" && s.keyFile != ""
+	ctx.Trace("s.http.listen", "Listening...", log.String("addr", addr),
 		log.Bool("tls", tlsEnabled),
 	)
-	atomic.StoreUint32(&h.mode, up)
+
+	atomic.StoreUint32(&s.mode, up)
+	var err error
 	if tlsEnabled {
-		return h.server.ListenAndServeTLS(h.certFile, h.keyFile)
+		err = s.http.ListenAndServeTLS(s.certFile, s.keyFile)
 	}
-	return h.server.ListenAndServe()
-	// TODO: Handle listen errors and catch shutdown error
+	err = s.http.ListenAndServe()
+	atomic.StoreUint32(&s.mode, down)
+
+	if err == http.ErrServerClosed {
+		// Suppress error caused by a server Shutdown or Close
+		return nil
+	}
+	return err
 }
 
 // Drain puts the handler into drain mode. All new requests will be
 // blocked with a 503 and it will block this call until all in-flight requests
 // have been completed
-func (h *Handler) Drain() {
-	atomic.StoreUint32(&h.mode, drain)
-	h.wg.Wait() // Wait for all in-flight requests to complete
-	atomic.StoreUint32(&h.mode, down)
-	// TODO: server shutdown
+func (s *Server) Drain() {
+	atomic.StoreUint32(&s.mode, drain)
+	s.wg.Wait()                           // Wait for all in-flight requests to complete
+	s.http.Shutdown(context.Background()) // Then close all idle connections
 }
 
 // isDraining checks whether the handler is draining
-func (h *Handler) isDraining() bool {
-	return atomic.LoadUint32(&h.mode) == drain
+func (s *Server) isDraining() bool {
+	return atomic.LoadUint32(&s.mode) == drain
 }
 
-func (h *Handler) buildHandleFunc(app app.Ctx, e Endpoint) func(
+func (s *Server) buildHandleFunc(app app.Ctx, e Endpoint) func(
 	w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Add to waitgroup
-		h.wg.Add(1)
-		defer h.wg.Done()
 
-		// Build context
+	serve := buildMiddlewareChain(s.middlewares, e)
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Add to waitgroup for a graceful shutdown
+		s.wg.Add(1)
+		defer s.wg.Done()
+
+		// Wrap net/http parameters
 		res := &responseWriter{http: w}
 		req := &Request{
 			startTime: time.Now(),
@@ -156,7 +175,7 @@ func (h *Handler) buildHandleFunc(app app.Ctx, e Endpoint) func(
 			Params: mux.Vars(r),
 		}
 
-		// Start or pick up journey
+		// Start or resume journey
 		var ctx journey.Ctx
 		if app.Config().Request.AllowContext && HasContext(req.HTTP) {
 			// Pick up journey where downstream left off
@@ -174,15 +193,14 @@ func (h *Handler) buildHandleFunc(app app.Ctx, e Endpoint) func(
 			ctx = journey.New(app)
 		}
 
-		if h.isDraining() {
+		if s.isDraining() {
 			ctx.Trace("http.draining", "Handler is draining")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
 
 		// Handle request
-		// TODO: Call middlewares from here and then call endpoint
-		e.Handle(ctx, res, req)
+		serve(ctx, res, req)
 
 		// Call it at the end (no defer)
 		ctx.End()

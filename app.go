@@ -7,11 +7,11 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/stairlin/lego/net"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/log/logger"
+	"github.com/stairlin/lego/net"
 	statsAdapter "github.com/stairlin/lego/stats/adapter"
 )
 
@@ -20,12 +20,12 @@ type App struct {
 	mu    sync.Mutex
 	ready *sync.Cond
 
-	service  string
-	ctx      app.Ctx
-	config   *config.Config
-	handlers *net.Reg
-	drain    bool
-	done     chan bool
+	service string
+	ctx     app.Ctx
+	config  *config.Config
+	servers *net.Reg
+	drain   bool
+	done    chan bool
 }
 
 // New creates a new App and returns it
@@ -75,12 +75,12 @@ func NewWithConfig(service string, c *config.Config) (*App, error) {
 
 	// Build app struct
 	app := &App{
-		service:  service,
-		ready:    ready,
-		ctx:      ctx,
-		config:   c,
-		handlers: net.NewReg(ctx),
-		done:     make(chan bool, 1),
+		service: service,
+		ready:   ready,
+		ctx:     ctx,
+		config:  c,
+		servers: net.NewReg(ctx),
+		done:    make(chan bool, 1),
 	}
 
 	// Start background services
@@ -102,7 +102,7 @@ func (a *App) Config() *config.Config {
 func (a *App) Serve() error {
 	a.ctx.Trace("lego.serve", "Start serving...")
 
-	err := a.handlers.Serve()
+	err := a.servers.Serve()
 	if err != nil {
 		a.ctx.Error("lego.serve.error", "Error with handler.Serve (%s)",
 			log.Error(err),
@@ -136,7 +136,7 @@ func (a *App) Drain() {
 	a.drain = true
 	a.mu.Unlock()
 
-	a.handlers.Drain() // Block all new requests and drain in-flight requests
+	a.servers.Drain()  // Block all new requests and drain in-flight requests
 	a.ctx.BG().Drain() // Now drain last background services
 
 	a.done <- true // Release Serve()

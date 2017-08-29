@@ -24,9 +24,9 @@ func main() {
 	}
 
 	// Register HTTP handler
-	h := http.NewHandler()
-	h.HandleFunc("/ping", http.GET, Ping)
-	app.RegisterHandler("127.0.0.1:3000", h)
+	s := http.NewServer()
+	s.HandleFunc("/ping", http.GET, Ping)
+	app.RegisterServer("127.0.0.1:3000", s)
 
 	// Start serving requests
 	err = app.Serve()

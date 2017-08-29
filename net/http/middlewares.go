@@ -10,20 +10,18 @@ import (
 	"github.com/stairlin/lego/log"
 )
 
-// MiddlewareFunc is the function signature of a middelware
-type MiddlewareFunc func(ctx journey.Ctx, w ResponseWriter, r *Request)
-
 // Middleware is a function called on the HTTP stack before an action
-type Middleware func(MiddlewareFunc) MiddlewareFunc
+type Middleware func(ServeFunc) ServeFunc
 
-func buildMiddlewareChain(l []Middleware,
-	action func(journey.Ctx, ResponseWriter, *Request),
-) MiddlewareFunc {
+func buildMiddlewareChain(l []Middleware, e Endpoint) ServeFunc {
+	f := func(ctx journey.Ctx, w ResponseWriter, r *Request) {
+		e.Serve(ctx, w, r)
+	}
 	if len(l) == 0 {
-		return action
+		return f
 	}
 
-	c := action
+	c := f
 	for i := len(l) - 1; i >= 0; i-- {
 		c = l[i](c)
 	}
@@ -31,7 +29,7 @@ func buildMiddlewareChain(l []Middleware,
 }
 
 // mwDebug adds useful debugging information to the response header
-func mwDebug(next MiddlewareFunc) MiddlewareFunc {
+func mwDebug(next ServeFunc) ServeFunc {
 	return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
 		w.Header().Add("Request-Id", ctx.UUID())
 		next(ctx, w, r)
@@ -39,7 +37,7 @@ func mwDebug(next MiddlewareFunc) MiddlewareFunc {
 }
 
 // mwLogging logs information about HTTP requests/responses
-func mwLogging(next MiddlewareFunc) MiddlewareFunc {
+func mwLogging(next ServeFunc) ServeFunc {
 	return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
 		ctx.Trace("h.http.req.start", "Request start",
 			log.String("method", r.method),
@@ -57,7 +55,7 @@ func mwLogging(next MiddlewareFunc) MiddlewareFunc {
 }
 
 // mwStats sends the request/response stats
-func mwStats(next MiddlewareFunc) MiddlewareFunc {
+func mwStats(next ServeFunc) ServeFunc {
 	return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
 		tags := map[string]string{
 			"method": r.method,
@@ -76,7 +74,7 @@ func mwStats(next MiddlewareFunc) MiddlewareFunc {
 }
 
 // mwPanic catches panic and recover
-func mwPanic(next MiddlewareFunc) MiddlewareFunc {
+func mwPanic(next ServeFunc) ServeFunc {
 	return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
 		// Wrap call to the next middleware
 		func() {
@@ -95,5 +93,42 @@ func mwPanic(next MiddlewareFunc) MiddlewareFunc {
 
 			next(ctx, w, r)
 		}()
+	}
+}
+
+// mwInterrupt interupts requests when the context cancels
+func mwInterrupt(next ServeFunc) ServeFunc {
+	return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
+		res := make(chan struct{}, 1)
+		rec := make(chan interface{}, 1)
+
+		go func() {
+			defer func() {
+				if ctx.AppConfig().Request.Panic {
+					return
+				}
+				if recover := recover(); recover != nil {
+					ctx.Error("http.panic", "Recovered from panic",
+						log.Object("err", recover),
+						log.String("stack", string(debug.Stack())),
+					)
+					rec <- recover
+				}
+			}()
+
+			next(ctx, w, r)
+			res <- struct{}{}
+		}()
+
+		select {
+		case <-res:
+			// OK
+		case <-rec:
+			// action panicked
+			w.WriteHeader(http.StatusInternalServerError)
+		case <-ctx.Done():
+			ctx.Trace("http.interrupt", "Request cancelled or timed out", log.Error(ctx.Err()))
+			w.WriteHeader(http.StatusGatewayTimeout)
+		}
 	}
 }

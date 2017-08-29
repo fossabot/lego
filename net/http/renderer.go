@@ -11,7 +11,7 @@ import (
 // Renderer is a response returned by an action
 type Renderer interface {
 	// Render writes a response to the response writer
-	Render(http.ResponseWriter) error
+	Render(ResponseWriter) error
 }
 
 // RenderJSON is a renderer that marshals responses in JSON
@@ -20,7 +20,7 @@ type RenderJSON struct {
 	V    interface{}
 }
 
-func (r *RenderJSON) Render(res http.ResponseWriter) error {
+func (r *RenderJSON) Render(res ResponseWriter) error {
 	// Header
 	res.Header().Add("Content-Type", "application/json; charset=utf-8")
 	res.WriteHeader(r.Code)
@@ -38,7 +38,7 @@ type RenderGob struct {
 	V    interface{}
 }
 
-func (r *RenderGob) Render(res http.ResponseWriter) error {
+func (r *RenderGob) Render(res ResponseWriter) error {
 	// Header
 	res.Header().Add("Content-Type", "application/octet-stream")
 	res.WriteHeader(r.Code)
@@ -55,7 +55,7 @@ type RenderHead struct {
 	Code int
 }
 
-func (r *RenderHead) Render(res http.ResponseWriter) error {
+func (r *RenderHead) Render(res ResponseWriter) error {
 	res.WriteHeader(r.Code)
 	return nil
 }
@@ -66,7 +66,7 @@ type RenderRedirect struct {
 	URL string
 }
 
-func (r *RenderRedirect) Render(res http.ResponseWriter) error {
+func (r *RenderRedirect) Render(res ResponseWriter) error {
 	http.Redirect(res, r.Req, r.URL, http.StatusTemporaryRedirect)
 	return nil
 }
@@ -77,7 +77,7 @@ type RenderData struct {
 	Reader      io.ReadCloser
 }
 
-func (r *RenderData) Render(res http.ResponseWriter) error {
+func (r *RenderData) Render(res ResponseWriter) error {
 	defer r.Reader.Close()
 	if r.ContentType != "" {
 		res.Header()["Content-Type"] = []string{r.ContentType}
@@ -94,7 +94,7 @@ type RenderConditional struct {
 	Next         Renderer
 }
 
-func (r *RenderConditional) Render(res http.ResponseWriter) error {
+func (r *RenderConditional) Render(res ResponseWriter) error {
 	lastModified := r.LastModified.UTC().Format(http.TimeFormat)
 	if r.ETag != "" {
 		res.Header().Add("ETag", r.ETag)

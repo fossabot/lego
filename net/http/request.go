@@ -19,5 +19,5 @@ type Request struct {
 
 // Parse parses the request body and decodes it on the given struct
 func (r *Request) Parse(ctx journey.Ctx, v interface{}) error {
-	return pickParser(ctx, r.HTTP).Parse(v)
+	return pickParser(ctx, r).Parse(v)
 }

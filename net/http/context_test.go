@@ -24,7 +24,7 @@ func TestDefaultBehaviour(t *testing.T) {
 	appCtx := tt.NewAppCtx("test-http")
 
 	// Build handler
-	h := http.NewHandler()
+	h := http.NewServer()
 	var gotContext journey.Ctx
 	h.HandleFunc("/test", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
@@ -34,7 +34,7 @@ func TestDefaultBehaviour(t *testing.T) {
 		w.Head(http.StatusOK)
 	})
 
-	addr := startHandler(appCtx, h)
+	addr := startServer(appCtx, h)
 
 	// Prepare context
 	ctx := journey.New(appCtx)
@@ -74,7 +74,7 @@ func TestAllowContext(t *testing.T) {
 	appCtx.Config().Request.AllowContext = true
 
 	// Build handler
-	h := http.NewHandler()
+	h := http.NewServer()
 	var gotContext journey.Ctx
 	h.HandleFunc("/test", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
@@ -84,7 +84,7 @@ func TestAllowContext(t *testing.T) {
 		w.Head(http.StatusOK)
 	})
 
-	addr := startHandler(appCtx, h)
+	addr := startServer(appCtx, h)
 
 	// Prepare context
 	ctx := journey.New(appCtx)
@@ -123,7 +123,7 @@ func TestBlockContext(t *testing.T) {
 	appCtx := tt.NewAppCtx("test-http")
 
 	// Build handler
-	h := http.NewHandler()
+	h := http.NewServer()
 	var gotContext journey.Ctx
 	h.HandleFunc("/test", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
@@ -133,7 +133,7 @@ func TestBlockContext(t *testing.T) {
 		w.Head(http.StatusOK)
 	})
 
-	addr := startHandler(appCtx, h)
+	addr := startServer(appCtx, h)
 
 	// Prepare context
 	ctx := journey.New(appCtx)
@@ -175,7 +175,7 @@ func TestPropagateContext(t *testing.T) {
 	appCtx.Config().Request.AllowContext = true
 
 	// Build handler
-	h := http.NewHandler()
+	h := http.NewServer()
 	var gotContext journey.Ctx
 	h.HandleFunc("/test", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
@@ -185,7 +185,7 @@ func TestPropagateContext(t *testing.T) {
 		w.Head(http.StatusOK)
 	})
 
-	addr := startHandler(appCtx, h)
+	addr := startServer(appCtx, h)
 
 	// Prepare context
 	ctx := journey.New(appCtx)
@@ -225,7 +225,7 @@ func TestPropagateContext(t *testing.T) {
 	})
 }
 
-func startHandler(appCtx app.Ctx, h *http.Handler) string {
+func startServer(appCtx app.Ctx, h *http.Server) string {
 	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
 	h.HandleFunc("/preflight", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,

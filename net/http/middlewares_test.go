@@ -17,9 +17,11 @@ func TestBuildMiddlewares(t *testing.T) {
 		factory.newMiddleware(1),
 		factory.newMiddleware(2),
 	}
-	a := func(ctx journey.Ctx, w ResponseWriter, r *Request) {}
+	e := &stdEndpoint{
+		handleFunc: func(ctx journey.Ctx, w ResponseWriter, r *Request) {},
+	}
 
-	c := buildMiddlewareChain(l, renderActionFunc(a))
+	c := buildMiddlewareChain(l, e)
 
 	c(journey.New(appCtx), &responseWriter{}, &Request{})
 
@@ -39,7 +41,7 @@ func (f *mwFactory) newMiddleware(expected int) Middleware {
 	n := f.N
 	f.N++
 
-	return func(next MiddlewareFunc) MiddlewareFunc {
+	return func(next ServeFunc) ServeFunc {
 		return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
 			f.C++
 			if n != expected {

@@ -51,8 +51,9 @@ import (
 	"os"
 
 	"github.com/stairlin/lego"
-	"github.com/stairlin/lego/net/http"
+	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/log"
+	"github.com/stairlin/lego/net/http"
 )
 
 type AppConfig struct {
@@ -69,9 +70,9 @@ func main() {
 	}
 
 	// Register HTTP handler
-	h := http.NewHandler()
-	h.Handle("/ping", http.GET, &Ping{})
-	app.RegisterHandler("127.0.0.1:3000", h)
+	s := http.NewServer()
+	s.HandleFunc("/ping", http.GET, Ping)
+	app.RegisterServer("127.0.0.1:3000", s)
 
 	// Start serving requests
 	err = app.Serve()
@@ -81,12 +82,10 @@ func main() {
 	}
 }
 
-// HTTP handler example
-type Ping struct{}
-
-func (a *Ping) Call(c *http.Context) http.Renderer {
-	c.Ctx.Trace("action.ping", "Simple request", log.Time("start_at", c.StartAt))
-	return c.Head(http.StatusOK)
+// Ping handler example
+func Ping(ctx journey.Ctx, w http.ResponseWriter, r *http.Request) {
+	ctx.Trace("action.ping", "Simple request", log.String("ua", r.HTTP.UserAgent()))
+	w.Head(http.StatusOK)
 }
 
 ```

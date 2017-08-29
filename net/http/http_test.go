@@ -3,6 +3,7 @@ package http_test
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"math"
 	netHttp "net/http"
 	"strings"
@@ -37,7 +38,7 @@ func TestHTTP(t *testing.T) {
 	appCtx := tt.NewAppCtx("test-http")
 
 	// Build handler
-	h := http.NewHandler()
+	h := http.NewServer()
 	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
 	h.HandleFunc("/preflight", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
@@ -75,7 +76,7 @@ func TestHTTPS(t *testing.T) {
 	appCtx := tt.NewAppCtx("test-https")
 
 	// Build handler
-	h := http.NewHandler()
+	h := http.NewServer()
 	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
 	h.HandleFunc("/preflight", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
@@ -136,7 +137,7 @@ func TestHTTPS_WithConfig(t *testing.T) {
 	appCtx := tt.NewAppCtx("test-https")
 
 	// Build handler
-	h := http.NewHandler()
+	h := http.NewServer()
 	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
 	h.HandleFunc("/preflight", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
@@ -202,5 +203,62 @@ func TestHTTPS_WithConfig(t *testing.T) {
 	}
 	if http.StatusOK != lastRes.StatusCode {
 		t.Errorf("expect status OK, but got code %d", lastRes.StatusCode)
+	}
+}
+
+func TestHTTP_Static(t *testing.T) {
+	tt := lt.New(t)
+	appCtx := tt.NewAppCtx("test-static-http")
+
+	// Build handler
+	h := http.NewServer()
+	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
+	h.HandleFunc("/preflight", http.GET, func(
+		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
+	) {
+		w.Head(http.StatusOK)
+	})
+	h.HandleStatic("/assets", "./")
+
+	// Start serving requests
+	go func() {
+		err := h.Serve(addr, appCtx)
+		if err != nil {
+			panic(err)
+		}
+	}()
+	// Ensure HTTP handler is ready to serve requests
+	var lastRes *netHttp.Response
+	for attempt := 1; attempt <= 10; attempt++ {
+		ctx := journey.New(appCtx)
+		res, err := http.Get(ctx, fmt.Sprintf("http://%s/preflight", addr))
+		lastRes = res
+		if err == nil && res.StatusCode == http.StatusOK {
+			break
+		}
+		backoff := math.Pow(2, float64(attempt))
+		time.Sleep(time.Millisecond * time.Duration(backoff))
+	}
+
+	if http.StatusOK != lastRes.StatusCode {
+		t.Errorf("expect to reach preflight endpoint, but got code %d", lastRes.StatusCode)
+	}
+
+	ctx := journey.New(appCtx)
+	res, err := http.Get(ctx, fmt.Sprintf("http://%s/assets/test_file.txt", addr))
+	if err != nil {
+		t.Fatalf("unexpected error on assets endpoint %s", err)
+	}
+	if http.StatusOK != res.StatusCode {
+		t.Fatalf("expect code %d, but got %d", http.StatusOK, res.StatusCode)
+	}
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("unexpected error when reading response body %s", err)
+	}
+	defer res.Body.Close()
+	expectData := "hello from a static endpoint"
+	if expectData != string(data) {
+		t.Errorf("expect code %s, but got %s", expectData, string(data))
 	}
 }

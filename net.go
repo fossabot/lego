@@ -2,7 +2,7 @@ package lego
 
 import "github.com/stairlin/lego/net"
 
-// RegisterHandler adds the given handler to the list of handlers
-func (a *App) RegisterHandler(addr string, h net.Handler) {
-	a.handlers.Add(addr, h)
+// RegisterServer adds the given server to the list of managed servers
+func (a *App) RegisterServer(addr string, s net.Server) {
+	a.servers.Add(addr, s)
 }

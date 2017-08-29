@@ -9,11 +9,11 @@ import (
 	"github.com/stairlin/lego/log"
 )
 
-// ErrEmptyReg is the error returned when there are no handlers registered
-var ErrEmptyReg = errors.New("there must be at least one registered handler")
+// ErrEmptyReg is the error returned when there are no servers registered
+var ErrEmptyReg = errors.New("there must be at least one registered server")
 
-// Handler is the interface to implement to be a valid handler
-type Handler interface {
+// Server is the interface to implement to be a valid server
+type Server interface {
 	Serve(addr string, ctx app.Ctx) error
 	Drain()
 }
@@ -23,7 +23,7 @@ type Reg struct {
 	mu sync.Mutex
 
 	ctx   app.Ctx
-	l     map[string]Handler
+	l     map[string]Server
 	drain bool
 }
 
@@ -31,12 +31,12 @@ type Reg struct {
 func NewReg(ctx app.Ctx) *Reg {
 	return &Reg{
 		ctx: ctx,
-		l:   map[string]Handler{},
+		l:   map[string]Server{},
 	}
 }
 
-// Add adds the given handler to the list of handlers
-func (r *Reg) Add(addr string, h Handler) {
+// Add adds the given server to the list of servers
+func (r *Reg) Add(addr string, h Server) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -49,7 +49,7 @@ func (r *Reg) Add(addr string, h Handler) {
 	}
 }
 
-// Serve allows handlers to serve requests
+// Serve starts all registered servers
 func (r *Reg) Serve() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -58,31 +58,31 @@ func (r *Reg) Serve() error {
 		return ErrEmptyReg
 	}
 
-	r.ctx.Trace("handler.serve.init", "Starting handlers...")
+	r.ctx.Trace("server.serve.init", "Starting servers...")
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(r.l))
 	for addr, h := range r.l {
-		go func(addr string, h Handler) {
+		go func(addr string, s Server) {
 			// Deregister itself upon completion
 			defer func() {
-				r.ctx.Trace("lego.serve.h.stop", "Handler has stopped running",
+				r.ctx.Trace("lego.serve.s.stop", "Server has stopped running",
 					log.String("addr", addr),
-					log.Type("handler", h),
+					log.Type("server", s),
 				)
 				r.mu.Lock()
 				r.deregister(addr)
 				r.mu.Unlock()
 			}()
 
-			r.ctx.Trace("lego.serve.h", "Handler starts serving",
+			r.ctx.Trace("lego.serve.s", "Server starts serving",
 				log.String("addr", addr),
-				log.Type("handler", h),
+				log.Type("server", s),
 			)
 			wg.Done()
-			err := h.Serve(addr, r.ctx)
+			err := s.Serve(addr, r.ctx)
 			if err != nil {
-				r.ctx.Error("lego.serve.h", "Handler error",
+				r.ctx.Error("lego.serve.s", "Server error",
 					log.String("addr", addr),
 					log.Error(err),
 				)
@@ -90,13 +90,13 @@ func (r *Reg) Serve() error {
 		}(addr, h)
 	}
 
-	wg.Wait() // Wait to boot all handlers
-	r.ctx.Trace("handler.serve.ready", "All handlers are running")
+	wg.Wait() // Wait to boot all servers
+	r.ctx.Trace("server.serve.ready", "All servers are running")
 
 	return nil
 }
 
-// Drain notify all handlers to enter in draining mode. It means they are no
+// Drain notify all servers to enter in draining mode. It means they are no
 // longer accepting new requests, but they can finish all in-flight requests
 func (r *Reg) Drain() {
 	r.mu.Lock()
@@ -115,36 +115,36 @@ func (r *Reg) Drain() {
 	wg := sync.WaitGroup{}
 	wg.Add(l)
 
-	// Drain handlers
-	r.ctx.Trace("handler.drain.init", "Start draining",
-		log.Int("handlers", l),
+	// Drain servers
+	r.ctx.Trace("server.drain.init", "Start draining",
+		log.Int("servers", l),
 	)
-	for _, h := range r.l {
-		r.ctx.Trace("handler.drain.h", "Drain handler",
-			log.Type("handler", h),
+	for _, s := range r.l {
+		r.ctx.Trace("server.drain.s", "Drain server",
+			log.Type("server", s),
 		)
-		go func(h Handler) {
-			h.Drain()
+		go func(s Server) {
+			s.Drain()
 			wg.Done()
-		}(h)
+		}(s)
 	}
 
 	wg.Wait()
 
 	r.drain = false
-	r.ctx.Trace("handler.drain.done", "All handlers have been drained")
+	r.ctx.Trace("server.drain.done", "All servers have been drained")
 }
 
-func (r *Reg) register(addr string, h Handler) error {
+func (r *Reg) register(addr string, s Server) error {
 	if _, ok := r.l[addr]; ok {
 		return fmt.Errorf(
-			"handler listening on <%s> has already been registered (%T)",
+			"server listening on <%s> has already been registered (%T)",
 			addr,
 			r.l[addr],
 		)
 	}
 
-	r.l[addr] = h
+	r.l[addr] = s
 	return nil
 }
 
