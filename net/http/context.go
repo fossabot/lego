@@ -1,56 +1,43 @@
 package http
 
 import (
-	"io"
+	"encoding/base64"
 	"net/http"
-	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"
 )
 
-// Context holds the request context that is injected into an action
-type Context struct {
-	App       app.Ctx
-	Ctx       journey.Ctx
-	StartTime time.Time
-	Params    map[string]string
-	Method    string
-	Path      string
-	Req       *http.Request
-	Res       *Response
+const contextHeader = "Ctx-Journey"
 
-	isDraining func() bool
-	action     ActionFunc
+// HasContext checks whether the request contains a context
+func HasContext(req *http.Request) bool {
+	return req.Header.Get(contextHeader) != ""
 }
 
-// Parse parses the request body and decodes it on the given struct
-func (c *Context) Parse(v interface{}) error {
-	return pickParser(c.Ctx, c.Req).Parse(v)
+// UnmarshalContext unmarshal a context from the request
+func UnmarshalContext(app app.Ctx, req *http.Request) (journey.Ctx, error) {
+	header := req.Header.Get(contextHeader)
+	data, err := base64.StdEncoding.DecodeString(string(header))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal context")
+	}
+	ctx, err := journey.UnmarshalGob(app, []byte(data))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal Context")
+	}
+	ctx = ctx.BranchOff(journey.Child)
+	return ctx, nil
 }
 
-// JSON encodes the given data to JSON
-func (c *Context) JSON(code int, data interface{}) Renderer {
-	return &RenderJSON{Code: code, V: data}
-}
-
-// Head returns a body-less response
-func (c *Context) Head(code int) Renderer {
-	return &RenderHead{Code: code}
-}
-
-// Redirect returns an HTTP redirection response
-func (c *Context) Redirect(url string) Renderer {
-	return &RenderRedirect{URL: url}
-}
-
-// Data encodes an arbitrary type of data
-func (c *Context) Data(code int, contentType string, data io.ReadCloser) Renderer {
-	return &RenderData{Code: code, ContentType: contentType, Reader: data}
-}
-
-// Conditional checks whether the request conditions are fresh.
-// If the request is fresh, it returns a 304, otherwise it calls the next renderer
-func (c *Context) Conditional(etag string, lastModified time.Time, next Renderer) Renderer {
-	return &RenderConditional{ETag: etag, LastModified: lastModified, Next: next}
+// MarshalContext marshals a context to the request.
+func MarshalContext(ctx journey.Ctx, req *http.Request) error {
+	data, err := journey.MarshalGob(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal Context")
+	}
+	text := base64.StdEncoding.EncodeToString(data)
+	req.Header.Add(contextHeader, text)
+	return nil
 }

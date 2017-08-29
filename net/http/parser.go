@@ -23,7 +23,9 @@ type Parser interface {
 
 // pickParser selects a Parser for the request content-type
 func pickParser(ctx journey.Ctx, req *http.Request) Parser {
-	ctx.Trace("action.parser.content_length", "Request content length", log.Int64("len", req.ContentLength))
+	ctx.Trace("action.parser.content_length", "Request content length",
+		log.Int64("len", req.ContentLength),
+	)
 
 	// If content type is not provided and the request body is empty,
 	// then there is no need to pick a parser
@@ -36,7 +38,6 @@ func pickParser(ctx journey.Ctx, req *http.Request) Parser {
 	// Parse mime type
 	m, _, err := mime.ParseMediaType(ct)
 	if err != nil {
-		// This can probably be demoted to a warning at some point
 		ctx.Warning("http.content_type.err", "Cannot parse Content-Type",
 			log.String("content_type", ct),
 			log.Error(err),

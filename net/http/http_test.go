@@ -39,8 +39,10 @@ func TestHTTP(t *testing.T) {
 	// Build handler
 	h := http.NewHandler()
 	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
-	h.HandleFunc("/preflight", http.GET, func(c *http.Context) http.Renderer {
-		return c.Head(http.StatusOK)
+	h.HandleFunc("/preflight", http.GET, func(
+		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
+	) {
+		w.Head(http.StatusOK)
 	})
 
 	// Start serving requests
@@ -75,12 +77,14 @@ func TestHTTPS(t *testing.T) {
 	// Build handler
 	h := http.NewHandler()
 	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
-	h.HandleFunc("/preflight", http.GET, func(c *http.Context) http.Renderer {
-		return c.Head(http.StatusOK)
+	h.HandleFunc("/preflight", http.GET, func(
+		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
+	) {
+		w.Head(http.StatusOK)
 	})
 
-	// Set TLS
-	h.SetTLS("./test_cert.pem", "./test_key.pem")
+	// Activate TLS
+	h.ActivateTLS("./test_cert.pem", "./test_key.pem")
 
 	// Start serving requests
 	go func() {
@@ -134,8 +138,10 @@ func TestHTTPS_WithConfig(t *testing.T) {
 	// Build handler
 	h := http.NewHandler()
 	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
-	h.HandleFunc("/preflight", http.GET, func(c *http.Context) http.Renderer {
-		return c.Head(http.StatusOK)
+	h.HandleFunc("/preflight", http.GET, func(
+		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
+	) {
+		w.Head(http.StatusOK)
 	})
 
 	// Set TLS
@@ -151,7 +157,8 @@ func TestHTTPS_WithConfig(t *testing.T) {
 			tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 		},
 	}
-	h.SetTLS("./test_cert.pem", "./test_key.pem", tlsConfig)
+	h.ActivateTLS("./test_cert.pem", "./test_key.pem")
+	h.SetOptions(http.OptTLS(tlsConfig))
 
 	// Start serving requests
 	go func() {

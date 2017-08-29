@@ -1,7 +1,6 @@
 package http
 
 import (
-	"net/http"
 	"testing"
 
 	"github.com/stairlin/lego/ctx/journey"
@@ -18,14 +17,11 @@ func TestBuildMiddlewares(t *testing.T) {
 		factory.newMiddleware(1),
 		factory.newMiddleware(2),
 	}
-	a := &dummyAction{}
+	a := func(ctx journey.Ctx, w ResponseWriter, r *Request) {}
 
-	c := buildMiddlewareChain(l, renderActionFunc(a.Call))
+	c := buildMiddlewareChain(l, renderActionFunc(a))
 
-	c(&Context{
-		App: appCtx,
-		Ctx: journey.New(appCtx),
-	})
+	c(journey.New(appCtx), &responseWriter{}, &Request{})
 
 	expected := 3
 	if factory.C != expected {
@@ -44,24 +40,12 @@ func (f *mwFactory) newMiddleware(expected int) Middleware {
 	f.N++
 
 	return func(next MiddlewareFunc) MiddlewareFunc {
-		return func(c *Context) {
+		return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
 			f.C++
 			if n != expected {
 				f.t.Errorf("expect to be called in position %d, but got %d", expected, n)
 			}
-			next(c)
+			next(ctx, w, r)
 		}
 	}
-}
-
-type dummyRenderer struct {
-}
-
-func (r *dummyRenderer) Render(res http.ResponseWriter, req *http.Request) error { return nil }
-
-type dummyAction struct {
-}
-
-func (a *dummyAction) Call(c *Context) Renderer {
-	return &dummyRenderer{}
 }

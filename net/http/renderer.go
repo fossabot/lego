@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/gob"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,16 +10,17 @@ import (
 
 // Renderer is a response returned by an action
 type Renderer interface {
-	Render(http.ResponseWriter, *http.Request) error
+	// Render writes a response to the response writer
+	Render(http.ResponseWriter) error
 }
 
-// RenderJSON is a renderer that marshal responses in JSON
+// RenderJSON is a renderer that marshals responses in JSON
 type RenderJSON struct {
 	Code int
 	V    interface{}
 }
 
-func (r *RenderJSON) Render(res http.ResponseWriter, req *http.Request) error {
+func (r *RenderJSON) Render(res http.ResponseWriter) error {
 	// Header
 	res.Header().Add("Content-Type", "application/json; charset=utf-8")
 	res.WriteHeader(r.Code)
@@ -30,23 +32,42 @@ func (r *RenderJSON) Render(res http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
+// RenderGob is a renderer that marshals responses in Gob
+type RenderGob struct {
+	Code int
+	V    interface{}
+}
+
+func (r *RenderGob) Render(res http.ResponseWriter) error {
+	// Header
+	res.Header().Add("Content-Type", "application/octet-stream")
+	res.WriteHeader(r.Code)
+
+	// Body
+	if err := gob.NewEncoder(res).Encode(r.V); err != nil {
+		return err
+	}
+	return nil
+}
+
 // RenderHead is a renderer that returns a body-less response
 type RenderHead struct {
 	Code int
 }
 
-func (r *RenderHead) Render(res http.ResponseWriter, req *http.Request) error {
+func (r *RenderHead) Render(res http.ResponseWriter) error {
 	res.WriteHeader(r.Code)
 	return nil
 }
 
 // RenderRedirect is a renderer that returns a redirection
 type RenderRedirect struct {
+	Req *http.Request
 	URL string
 }
 
-func (r *RenderRedirect) Render(res http.ResponseWriter, req *http.Request) error {
-	http.Redirect(res, req, r.URL, http.StatusTemporaryRedirect)
+func (r *RenderRedirect) Render(res http.ResponseWriter) error {
+	http.Redirect(res, r.Req, r.URL, http.StatusTemporaryRedirect)
 	return nil
 }
 
@@ -56,7 +77,7 @@ type RenderData struct {
 	Reader      io.ReadCloser
 }
 
-func (r *RenderData) Render(res http.ResponseWriter, req *http.Request) error {
+func (r *RenderData) Render(res http.ResponseWriter) error {
 	defer r.Reader.Close()
 	if r.ContentType != "" {
 		res.Header()["Content-Type"] = []string{r.ContentType}
@@ -67,12 +88,13 @@ func (r *RenderData) Render(res http.ResponseWriter, req *http.Request) error {
 }
 
 type RenderConditional struct {
+	Req          *http.Request
 	ETag         string
 	LastModified time.Time
 	Next         Renderer
 }
 
-func (r *RenderConditional) Render(res http.ResponseWriter, req *http.Request) error {
+func (r *RenderConditional) Render(res http.ResponseWriter) error {
 	lastModified := r.LastModified.UTC().Format(http.TimeFormat)
 	if r.ETag != "" {
 		res.Header().Add("ETag", r.ETag)
@@ -81,10 +103,10 @@ func (r *RenderConditional) Render(res http.ResponseWriter, req *http.Request) e
 		res.Header().Add("Last-Modified", lastModified)
 	}
 
-	if (r.ETag != "" && req.Header.Get("If-None-Match") == r.ETag) ||
-		(lastModified != "" && req.Header.Get("If-Modified-Since") == lastModified) {
+	if (r.ETag != "" && r.Req.Header.Get("If-None-Match") == r.ETag) ||
+		(lastModified != "" && r.Req.Header.Get("If-Modified-Since") == lastModified) {
 		res.WriteHeader(http.StatusNotModified)
 		return nil
 	}
-	return r.Next.Render(res, req)
+	return r.Next.Render(res)
 }

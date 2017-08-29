@@ -26,10 +26,12 @@ func TestDefaultBehaviour(t *testing.T) {
 	// Build handler
 	h := http.NewHandler()
 	var gotContext journey.Ctx
-	h.HandleFunc("/test", http.GET, func(c *http.Context) http.Renderer {
-		c.Ctx.Trace("http.test", "Test endpoint called")
-		gotContext = c.Ctx
-		return c.Head(http.StatusOK)
+	h.HandleFunc("/test", http.GET, func(
+		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
+	) {
+		ctx.Trace("http.test", "Test endpoint called")
+		gotContext = ctx
+		w.Head(http.StatusOK)
 	})
 
 	addr := startHandler(appCtx, h)
@@ -74,10 +76,12 @@ func TestAllowContext(t *testing.T) {
 	// Build handler
 	h := http.NewHandler()
 	var gotContext journey.Ctx
-	h.HandleFunc("/test", http.GET, func(c *http.Context) http.Renderer {
-		c.Ctx.Trace("http.test", "Test endpoint called")
-		gotContext = c.Ctx
-		return c.Head(http.StatusOK)
+	h.HandleFunc("/test", http.GET, func(
+		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
+	) {
+		ctx.Trace("http.test", "Test endpoint called")
+		gotContext = ctx
+		w.Head(http.StatusOK)
 	})
 
 	addr := startHandler(appCtx, h)
@@ -121,10 +125,12 @@ func TestBlockContext(t *testing.T) {
 	// Build handler
 	h := http.NewHandler()
 	var gotContext journey.Ctx
-	h.HandleFunc("/test", http.GET, func(c *http.Context) http.Renderer {
-		c.Ctx.Trace("http.test", "Test endpoint called")
-		gotContext = c.Ctx
-		return c.Head(http.StatusOK)
+	h.HandleFunc("/test", http.GET, func(
+		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
+	) {
+		ctx.Trace("http.test", "Test endpoint called")
+		gotContext = ctx
+		w.Head(http.StatusOK)
 	})
 
 	addr := startHandler(appCtx, h)
@@ -171,10 +177,12 @@ func TestPropagateContext(t *testing.T) {
 	// Build handler
 	h := http.NewHandler()
 	var gotContext journey.Ctx
-	h.HandleFunc("/test", http.GET, func(c *http.Context) http.Renderer {
-		c.Ctx.Trace("http.test", "Test endpoint called")
-		gotContext = c.Ctx
-		return c.Head(http.StatusOK)
+	h.HandleFunc("/test", http.GET, func(
+		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
+	) {
+		ctx.Trace("http.test", "Test endpoint called")
+		gotContext = ctx
+		w.Head(http.StatusOK)
 	})
 
 	addr := startHandler(appCtx, h)
@@ -219,8 +227,10 @@ func TestPropagateContext(t *testing.T) {
 
 func startHandler(appCtx app.Ctx, h *http.Handler) string {
 	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
-	h.HandleFunc("/preflight", http.GET, func(c *http.Context) http.Renderer {
-		return c.Head(http.StatusOK)
+	h.HandleFunc("/preflight", http.GET, func(
+		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
+	) {
+		w.Head(http.StatusOK)
 	})
 
 	// Start serving requests

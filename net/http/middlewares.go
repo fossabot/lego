@@ -6,16 +6,19 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/log"
 )
 
 // MiddlewareFunc is the function signature of a middelware
-type MiddlewareFunc func(c *Context)
+type MiddlewareFunc func(ctx journey.Ctx, w ResponseWriter, r *Request)
 
 // Middleware is a function called on the HTTP stack before an action
 type Middleware func(MiddlewareFunc) MiddlewareFunc
 
-func buildMiddlewareChain(l []Middleware, action MiddlewareFunc) MiddlewareFunc {
+func buildMiddlewareChain(l []Middleware,
+	action func(journey.Ctx, ResponseWriter, *Request),
+) MiddlewareFunc {
 	if len(l) == 0 {
 		return action
 	}
@@ -29,80 +32,68 @@ func buildMiddlewareChain(l []Middleware, action MiddlewareFunc) MiddlewareFunc 
 
 // mwDebug adds useful debugging information to the response header
 func mwDebug(next MiddlewareFunc) MiddlewareFunc {
-	return func(c *Context) {
-		c.Res.Header().Add("Request-Id", c.Ctx.UUID())
-		next(c)
-	}
-}
-
-// mwDraining blocks the request when the handler is draining
-func mwDraining(next MiddlewareFunc) MiddlewareFunc {
-	return func(c *Context) {
-		if c.isDraining() {
-			c.Ctx.Trace("http.mw.draining", "Service is draining")
-			c.Res.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		next(c)
+	return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
+		w.Header().Add("Request-Id", ctx.UUID())
+		next(ctx, w, r)
 	}
 }
 
 // mwLogging logs information about HTTP requests/responses
 func mwLogging(next MiddlewareFunc) MiddlewareFunc {
-	return func(c *Context) {
-		c.Ctx.Trace("h.http.req.start", "Request start",
-			log.String("method", c.Method),
-			log.String("path", c.Path),
-			log.String("user_agent", c.Req.Header.Get("User-Agent")),
+	return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
+		ctx.Trace("h.http.req.start", "Request start",
+			log.String("method", r.method),
+			log.String("path", r.path),
+			log.String("user_agent", r.HTTP.Header.Get("User-Agent")),
 		)
 
-		next(c)
+		next(ctx, w, r)
 
-		c.Ctx.Trace("h.http.req.end", "Request end",
-			log.Int("status", c.Res.Code()),
-			log.Duration("duration", time.Since(c.StartTime)),
+		ctx.Trace("h.http.req.end", "Request end",
+			log.Int("status", w.Code()),
+			log.Duration("duration", time.Since(r.startTime)),
 		)
 	}
 }
 
 // mwStats sends the request/response stats
 func mwStats(next MiddlewareFunc) MiddlewareFunc {
-	return func(c *Context) {
+	return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
 		tags := map[string]string{
-			"method": c.Method,
-			"path":   c.Path,
+			"method": r.method,
+			"path":   r.path,
 		}
-		c.Ctx.Stats().Inc("http.conc", tags)
+		ctx.Stats().Inc("http.conc", tags)
 
 		// Next middleware
-		next(c)
+		next(ctx, w, r)
 
-		tags["status"] = strconv.Itoa(c.Res.Code())
-		c.Ctx.Stats().Histogram("http.call", 1, tags)
-		c.Ctx.Stats().Timing("http.time", time.Since(c.StartTime), tags)
-		c.Ctx.Stats().Dec("http.conc", tags)
+		tags["status"] = strconv.Itoa(w.Code())
+		ctx.Stats().Histogram("http.call", 1, tags)
+		ctx.Stats().Timing("http.time", time.Since(r.startTime), tags)
+		ctx.Stats().Dec("http.conc", tags)
 	}
 }
 
 // mwPanic catches panic and recover
 func mwPanic(next MiddlewareFunc) MiddlewareFunc {
-	return func(c *Context) {
+	return func(ctx journey.Ctx, w ResponseWriter, r *Request) {
 		// Wrap call to the next middleware
 		func() {
 			defer func() {
-				if c.App.Config().Request.Panic {
+				if ctx.AppConfig().Request.Panic {
 					return
 				}
 				if recover := recover(); recover != nil {
-					c.Res.WriteHeader(http.StatusInternalServerError)
-					c.Ctx.Error("http.mw.panic", "Recovered from panic",
+					w.WriteHeader(http.StatusInternalServerError)
+					ctx.Error("http.mw.panic", "Recovered from panic",
 						log.Object("err", recover),
 						log.String("stack", string(debug.Stack())),
 					)
 				}
 			}()
 
-			next(c)
+			next(ctx, w, r)
 		}()
 	}
 }
