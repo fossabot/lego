@@ -85,7 +85,7 @@ type ResponseWriter interface {
 
 	// Conditional checks whether the request conditions are fresh.
 	// If the request is fresh, it returns a 304, otherwise it calls the next renderer
-	Conditional(req *http.Request, etag string, lastModified time.Time, next Renderer) error
+	Conditional(req *http.Request, etag string, lastModified time.Time, next func() error) error
 }
 
 // responseWriter is the implementation of ResponseWriter
@@ -153,9 +153,20 @@ func (r *responseWriter) Data(code int, contentType string, data io.ReadCloser,
 }
 
 func (r *responseWriter) Conditional(req *http.Request, etag string,
-	lastModified time.Time, next Renderer) error {
+	lastModified time.Time, next func() error) error {
 	f := &RenderConditional{
-		Req: req, ETag: etag, LastModified: lastModified, Next: next,
+		Req:          req,
+		ETag:         etag,
+		LastModified: lastModified,
+		Next:         &rendererWrapper{F: next},
 	}
 	return f.Render(r)
+}
+
+type rendererWrapper struct {
+	F func() error
+}
+
+func (r *rendererWrapper) Render(ResponseWriter) error {
+	return r.F()
 }
