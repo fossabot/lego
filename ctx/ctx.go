@@ -1,12 +1,16 @@
 package ctx
 
 import (
+	netCtx "golang.org/x/net/context"
+
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/stats"
 )
 
 // Ctx is the root interface that defines a context
 type Ctx interface {
+	netCtx.Context
+
 	Logger
 	Stats
 }

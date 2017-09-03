@@ -33,7 +33,6 @@ const (
 // Ctx is the journey context interface
 type Ctx interface {
 	ctx.Ctx
-	netCtx.Context
 
 	UUID() string
 	ShortID() string
@@ -46,7 +45,7 @@ type Ctx interface {
 	Store(key interface{}, v interface{})
 	Load(key interface{}) interface{}
 	Delete(key interface{})
-	Range(f func(key, value interface{}) bool)
+	RangeValues(f func(key, value interface{}) bool)
 }
 
 // context holds the context of a request (journey) during its whole lifecycle
@@ -167,9 +166,9 @@ func (c *context) Delete(key interface{}) {
 	c.KV.delete(key)
 }
 
-// Range calls f sequentially for each key and value present in the map.
+// RangeValues calls f sequentially for each key and value present in the map.
 // If f returns false, range stops the iteration.
-func (c *context) Range(f func(key, value interface{}) bool) {
+func (c *context) RangeValues(f func(key, value interface{}) bool) {
 	c.KV.r(f)
 }
 
@@ -246,7 +245,15 @@ func (c *context) stats() stats.Stats {
 // BranchOff returns a new child context that branches off from the original context
 func (c *context) BranchOff(t Type) Ctx {
 	c.Trace("ctx.journey.branch_off", "New sub context", log.String("id", c.ID))
-	ctx := c.createSubCtx()
+	ctx := &context{
+		ID:         c.ID,
+		Stepper:    c.Stepper.BranchOff(),
+		KV:         c.KV,
+		net:        nil,
+		app:        c.app,
+		logger:     c.logger,
+		cancelFunc: func() {},
+	}
 
 	// If we have a root context, we break the context cancellation propagation
 	if t == Root {
@@ -261,18 +268,6 @@ func (c *context) BranchOff(t Type) Ctx {
 		ctx.net, ctx.cancelFunc = netCtx.WithCancel(c.net)
 	}
 	return ctx
-}
-
-func (c *context) createSubCtx() *context {
-	return &context{
-		ID:         c.ID,
-		Stepper:    c.Stepper.BranchOff(),
-		KV:         c.KV,
-		net:        nil,
-		app:        c.app,
-		logger:     c.logger,
-		cancelFunc: func() {},
-	}
 }
 
 // spaceOut joins the given args and separate them with spaces
@@ -292,9 +287,9 @@ func build(ctx app.Ctx) *context {
 
 	reqConfig := c.app.Config().Request
 	if reqConfig.Timeout() != 0 {
-		c.net, c.cancelFunc = netCtx.WithTimeout(c.app.RootContext(), reqConfig.Timeout())
+		c.net, c.cancelFunc = netCtx.WithTimeout(c.app, reqConfig.Timeout())
 	} else {
-		c.net, c.cancelFunc = netCtx.WithCancel(c.app.RootContext())
+		c.net, c.cancelFunc = netCtx.WithCancel(c.app)
 	}
 	return c
 }

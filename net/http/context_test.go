@@ -57,7 +57,7 @@ func TestDefaultBehaviour(t *testing.T) {
 	if ctx.UUID() == gotContext.UUID() {
 		t.Error("expect contexts to be different")
 	}
-	ctx.Range(func(key, expect interface{}) bool {
+	ctx.RangeValues(func(key, expect interface{}) bool {
 		v := gotContext.Load(key)
 		if v != nil {
 			t.Errorf("expect key %s to NOT be present", key)
@@ -107,7 +107,7 @@ func TestAllowContext(t *testing.T) {
 	if ctx.UUID() == gotContext.UUID() {
 		t.Error("expect contexts to be different")
 	}
-	ctx.Range(func(key, expect interface{}) bool {
+	ctx.RangeValues(func(key, expect interface{}) bool {
 		v := gotContext.Load(key)
 		if v != nil {
 			t.Errorf("expect key %s to NOT be present", key)
@@ -158,7 +158,7 @@ func TestBlockContext(t *testing.T) {
 	if ctx.UUID() == gotContext.UUID() {
 		t.Error("expect contexts to be different")
 	}
-	ctx.Range(func(key, expect interface{}) bool {
+	ctx.RangeValues(func(key, expect interface{}) bool {
 		v := gotContext.Load(key)
 		if v != nil {
 			t.Errorf("expect key %s to NOT be present", key)
@@ -213,7 +213,7 @@ func TestPropagateContext(t *testing.T) {
 	if gotContext == nil {
 		t.Fatalf("expect KV to not be nil")
 	}
-	ctx.Range(func(key, expect interface{}) bool {
+	ctx.RangeValues(func(key, expect interface{}) bool {
 		got := gotContext.Load(key)
 		if expect != got {
 			t.Errorf("expect to value for key %s to be %v, but got %v", key, expect, got)
