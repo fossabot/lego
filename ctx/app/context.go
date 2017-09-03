@@ -29,14 +29,13 @@ type Ctx interface {
 
 // context holds the application context
 type context struct {
-	AppConfig *config.Config
-	BGReg     *bg.Reg
-
-	net     netCtx.Context
-	service string
-	l       log.Logger
-	lFields []log.Field
-	stats   stats.Stats
+	appConfig *config.Config
+	bgReg     *bg.Reg
+	net       netCtx.Context
+	service   string
+	l         log.Logger
+	lFields   []log.Field
+	stats     stats.Stats
 }
 
 // NewCtx creates a new app context
@@ -52,8 +51,8 @@ func NewCtx(service string, c *config.Config, l log.Logger, s stats.Stats) Ctx {
 
 	return &context{
 		service:   service,
-		AppConfig: c,
-		BGReg:     reg,
+		appConfig: c,
+		bgReg:     reg,
 		net:       netCtx.Background(),
 		l:         l.AddCalldepth(1),
 		lFields:   lf,
@@ -74,11 +73,11 @@ func (c *context) Stats() stats.Stats {
 }
 
 func (c *context) Config() *config.Config {
-	return c.AppConfig
+	return c.appConfig
 }
 
 func (c *context) BG() *bg.Reg {
-	return c.BGReg
+	return c.bgReg
 }
 
 // Trace level logs are to follow the code executio step by step
@@ -139,8 +138,8 @@ func (c *context) incLogLevelCount(lvl log.Level, tag string) {
 		"level":   lvl.String(),
 		"tag":     tag,
 		"service": c.service,
-		"node":    c.AppConfig.Node,
-		"version": c.AppConfig.Version,
+		"node":    c.appConfig.Node,
+		"version": c.appConfig.Version,
 	}
 
 	c.stats.Histogram("log.level", 1, tags)
