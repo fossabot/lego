@@ -39,10 +39,14 @@ type Ctx interface {
 	ShortID() string
 	AppConfig() *config.Config
 	BG(f func(c Ctx)) error
-	KV() *KV
 	BranchOff(t Type) Ctx
 	Cancel()
 	End()
+
+	Store(key interface{}, v interface{})
+	Load(key interface{}) interface{}
+	Delete(key interface{})
+	Range(f func(key, value interface{}) bool)
 }
 
 // context holds the context of a request (journey) during its whole lifecycle
@@ -55,7 +59,7 @@ type context struct {
 	Type    Type
 	ID      string // (hopefully) globally unique identifier
 	Stepper *Stepper
-	Store   *KV
+	KV      *KV
 }
 
 // New creates a new context and returns it
@@ -71,7 +75,7 @@ func New(ctx app.Ctx) Ctx {
 	c.Type = Root
 	c.ID = id
 	c.Stepper = NewStepper()
-	c.Store = NewKV()
+	c.KV = &KV{Map: map[interface{}]interface{}{}}
 	return c
 }
 
@@ -146,8 +150,27 @@ func (c *context) Error(tag, msg string, fields ...log.Field) {
 	c.incLogLevelCount(log.LevelError, tag)
 }
 
-func (c *context) KV() *KV {
-	return c.Store
+// Store sets the value for a key. If the key already exists, it will
+// be updated with the new value
+func (c *context) Store(key interface{}, v interface{}) {
+	c.KV.store(key, v)
+}
+
+// Load returns the value stored in the map for a key, or nil if no value is present.
+// The ok result indicates whether value was found in the map.
+func (c *context) Load(key interface{}) interface{} {
+	return c.KV.load(key)
+}
+
+// Delete deletes the value for a key. If the key does exist, it will be ignored
+func (c *context) Delete(key interface{}) {
+	c.KV.delete(key)
+}
+
+// Range calls f sequentially for each key and value present in the map.
+// If f returns false, range stops the iteration.
+func (c *context) Range(f func(key, value interface{}) bool) {
+	c.KV.r(f)
 }
 
 // # Net Context functions
@@ -244,7 +267,7 @@ func (c *context) createSubCtx() *context {
 	return &context{
 		ID:         c.ID,
 		Stepper:    c.Stepper.BranchOff(),
-		Store:      c.Store,
+		KV:         c.KV,
 		net:        nil,
 		app:        c.app,
 		logger:     c.logger,

@@ -242,7 +242,7 @@ func TestJourney_MarshallingKV(t *testing.T) {
 	app := tt.NewAppCtx("journey-test")
 	ctx := journey.New(app)
 
-	ctx.KV().Store("foo", "bar")
+	ctx.Store("foo", "bar")
 
 	// Create an encoder and send a value.
 	data, err := journey.MarshalGob(ctx)
@@ -256,10 +256,7 @@ func TestJourney_MarshallingKV(t *testing.T) {
 		t.Fatal("Unmarshal:", err)
 	}
 
-	v, ok := ctx.KV().Load("foo")
-	if !ok {
-		t.Fatal("expect kv to have key foo")
-	}
+	v := ctx.Load("foo")
 	if v != "bar" {
 		t.Fatalf("expect value bar, but got %s", v)
 	}

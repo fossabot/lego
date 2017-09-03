@@ -39,9 +39,9 @@ func TestDefaultBehaviour(t *testing.T) {
 	// Prepare context
 	ctx := journey.New(appCtx)
 	ctx.Trace("prepare", "Prepare context")
-	ctx.KV().Store("lang", "en_GB")
-	ctx.KV().Store("ip", "10.0.0.21")
-	ctx.KV().Store("flag", 3)
+	ctx.Store("lang", "en_GB")
+	ctx.Store("ip", "10.0.0.21")
+	ctx.Store("flag", 3)
 
 	// Send request
 	client := http.Client{}
@@ -57,9 +57,9 @@ func TestDefaultBehaviour(t *testing.T) {
 	if ctx.UUID() == gotContext.UUID() {
 		t.Error("expect contexts to be different")
 	}
-	ctx.KV().Range(func(key, expect interface{}) bool {
-		_, ok := gotContext.KV().Load(key)
-		if ok {
+	ctx.Range(func(key, expect interface{}) bool {
+		v := gotContext.Load(key)
+		if v != nil {
 			t.Errorf("expect key %s to NOT be present", key)
 		}
 		return false
@@ -89,9 +89,9 @@ func TestAllowContext(t *testing.T) {
 	// Prepare context
 	ctx := journey.New(appCtx)
 	ctx.Trace("prepare", "Prepare context")
-	ctx.KV().Store("lang", "en_GB")
-	ctx.KV().Store("ip", "10.0.0.21")
-	ctx.KV().Store("flag", 3)
+	ctx.Store("lang", "en_GB")
+	ctx.Store("ip", "10.0.0.21")
+	ctx.Store("flag", 3)
 
 	// Send request
 	client := http.Client{}
@@ -107,9 +107,9 @@ func TestAllowContext(t *testing.T) {
 	if ctx.UUID() == gotContext.UUID() {
 		t.Error("expect contexts to be different")
 	}
-	ctx.KV().Range(func(key, expect interface{}) bool {
-		_, ok := gotContext.KV().Load(key)
-		if ok {
+	ctx.Range(func(key, expect interface{}) bool {
+		v := gotContext.Load(key)
+		if v != nil {
 			t.Errorf("expect key %s to NOT be present", key)
 		}
 		return false
@@ -138,9 +138,9 @@ func TestBlockContext(t *testing.T) {
 	// Prepare context
 	ctx := journey.New(appCtx)
 	ctx.Trace("prepare", "Prepare context")
-	ctx.KV().Store("lang", "en_GB")
-	ctx.KV().Store("ip", "10.0.0.21")
-	ctx.KV().Store("flag", 3)
+	ctx.Store("lang", "en_GB")
+	ctx.Store("ip", "10.0.0.21")
+	ctx.Store("flag", 3)
 
 	// Send request
 	client := http.Client{
@@ -158,9 +158,9 @@ func TestBlockContext(t *testing.T) {
 	if ctx.UUID() == gotContext.UUID() {
 		t.Error("expect contexts to be different")
 	}
-	ctx.KV().Range(func(key, expect interface{}) bool {
-		_, ok := gotContext.KV().Load(key)
-		if ok {
+	ctx.Range(func(key, expect interface{}) bool {
+		v := gotContext.Load(key)
+		if v != nil {
 			t.Errorf("expect key %s to NOT be present", key)
 		}
 		return false
@@ -190,9 +190,9 @@ func TestPropagateContext(t *testing.T) {
 	// Prepare context
 	ctx := journey.New(appCtx)
 	ctx.Trace("prepare", "Prepare context")
-	ctx.KV().Store("lang", "en_GB")
-	ctx.KV().Store("ip", "10.0.0.21")
-	ctx.KV().Store("flag", 3)
+	ctx.Store("lang", "en_GB")
+	ctx.Store("ip", "10.0.0.21")
+	ctx.Store("flag", 3)
 
 	// Send request
 	client := http.Client{
@@ -210,14 +210,11 @@ func TestPropagateContext(t *testing.T) {
 	if ctx.UUID() != gotContext.UUID() {
 		t.Errorf("expect context to have UUID %s, but got %s", ctx.UUID(), gotContext.UUID())
 	}
-	if gotContext.KV() == nil {
+	if gotContext == nil {
 		t.Fatalf("expect KV to not be nil")
 	}
-	ctx.KV().Range(func(key, expect interface{}) bool {
-		got, ok := gotContext.KV().Load(key)
-		if !ok {
-			t.Errorf("expect key %s to be present", key)
-		}
+	ctx.Range(func(key, expect interface{}) bool {
+		got := gotContext.Load(key)
 		if expect != got {
 			t.Errorf("expect to value for key %s to be %v, but got %v", key, expect, got)
 		}
