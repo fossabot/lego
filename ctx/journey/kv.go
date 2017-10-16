@@ -42,7 +42,7 @@ func (a *KV) r(f func(key, value interface{}) bool) {
 }
 
 func (a *KV) clone() *KV {
-	copy := KV{}
+	copy := KV{Map: map[interface{}]interface{}{}}
 	a.mu.RLock()
 	for k, v := range a.Map {
 		copy.Map[k] = v
