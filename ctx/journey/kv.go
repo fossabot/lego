@@ -40,3 +40,13 @@ func (a *KV) r(f func(key, value interface{}) bool) {
 		}
 	}
 }
+
+func (a *KV) clone() *KV {
+	copy := KV{}
+	a.mu.RLock()
+	for k, v := range a.Map {
+		copy.Map[k] = v
+	}
+	a.mu.RUnlock()
+	return &copy
+}

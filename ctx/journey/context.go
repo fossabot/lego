@@ -248,7 +248,7 @@ func (c *context) BranchOff(t Type) Ctx {
 	ctx := &context{
 		ID:         c.ID,
 		Stepper:    c.Stepper.BranchOff(),
-		KV:         c.KV,
+		KV:         c.KV.clone(),
 		net:        nil,
 		app:        c.app,
 		logger:     c.logger,
