@@ -199,7 +199,12 @@ func (s *Server) unaryInterceptor(
 	if s.app.Config().Request.AllowContext {
 		var err error
 		context, err = ExtractContext(context, s.app)
-		if err != nil {
+		switch err {
+		case ErrMissingJourney:
+			// TODO: Create journey from generic context
+			context = journey.New(s.app)
+		case nil:
+		default:
 			return nil, err
 		}
 	} else {
