@@ -1,12 +1,13 @@
 package net_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/stairlin/lego/net"
 	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/net"
 	lt "github.com/stairlin/lego/testing"
 )
 
@@ -44,10 +45,10 @@ func TestServe(t *testing.T) {
 		h    *dummyH
 		addr string
 	}{
-		{h: NewDummyH(), addr: "localhost:8080"},
-		{h: NewDummyH(), addr: "localhost:8888"},
-		{h: NewDummyH(), addr: ":9000"},
-		{h: NewDummyH(), addr: ":9999"},
+		{h: NewDummyH(), addr: fmt.Sprintf("localhost:%d", lt.NextPort())},
+		{h: NewDummyH(), addr: fmt.Sprintf("localhost:%d", lt.NextPort())},
+		{h: NewDummyH(), addr: fmt.Sprintf(":%d", lt.NextPort())},
+		{h: NewDummyH(), addr: fmt.Sprintf(":%d", lt.NextPort())},
 	}
 
 	// Register handlers
@@ -95,12 +96,12 @@ func TestDrain(t *testing.T) {
 		h    *dummyH
 		addr string
 	}{
-		{h: NewDummyH(), addr: "localhost:8080"},
-		{h: NewDummyH(), addr: "localhost:8888"},
-		{h: NewDummyH(), addr: ":9000"},
-		{h: NewDummyH(), addr: ":9001"},
-		{h: NewDummyH(), addr: ":9002"},
-		{h: NewDummyH(), addr: ":9003"},
+		{h: NewDummyH(), addr: fmt.Sprintf("localhost:%d", lt.NextPort())},
+		{h: NewDummyH(), addr: fmt.Sprintf("localhost:%d", lt.NextPort())},
+		{h: NewDummyH(), addr: fmt.Sprintf(":%d", lt.NextPort())},
+		{h: NewDummyH(), addr: fmt.Sprintf(":%d", lt.NextPort())},
+		{h: NewDummyH(), addr: fmt.Sprintf(":%d", lt.NextPort())},
+		{h: NewDummyH(), addr: fmt.Sprintf(":%d", lt.NextPort())},
 	}
 
 	// Register handlers

@@ -7,7 +7,6 @@ import (
 	"math"
 	netHttp "net/http"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -16,30 +15,13 @@ import (
 	lt "github.com/stairlin/lego/testing"
 )
 
-// portSequence returns a sequence of port numbers. It should be used
-// for test handlers in order to avoid port clashes
-var portSequence = &sequencer{n: 9900}
-
-type sequencer struct {
-	mu sync.Mutex
-	n  int
-}
-
-func (s *sequencer) next() int {
-	s.mu.Lock()
-	p := s.n
-	s.n++
-	s.mu.Unlock()
-	return p
-}
-
 func TestHTTP(t *testing.T) {
 	tt := lt.New(t)
 	appCtx := tt.NewAppCtx("test-http")
 
 	// Build handler
 	h := http.NewServer()
-	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
+	addr := fmt.Sprintf("127.0.0.1:%d", lt.NextPort())
 	h.HandleFunc("/preflight", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
 	) {
@@ -77,7 +59,7 @@ func TestHTTPS(t *testing.T) {
 
 	// Build handler
 	h := http.NewServer()
-	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
+	addr := fmt.Sprintf("127.0.0.1:%d", lt.NextPort())
 	h.HandleFunc("/preflight", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
 	) {
@@ -138,7 +120,7 @@ func TestHTTPS_WithConfig(t *testing.T) {
 
 	// Build handler
 	h := http.NewServer()
-	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
+	addr := fmt.Sprintf("127.0.0.1:%d", lt.NextPort())
 	h.HandleFunc("/preflight", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
 	) {
@@ -212,7 +194,7 @@ func TestHTTP_Static(t *testing.T) {
 
 	// Build handler
 	h := http.NewServer()
-	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
+	addr := fmt.Sprintf("127.0.0.1:%d", lt.NextPort())
 	h.HandleFunc("/preflight", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
 	) {
