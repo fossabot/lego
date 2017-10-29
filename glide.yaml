@@ -11,3 +11,5 @@ import:
   - context
 - package: github.com/pkg/errors
   version: ^0.8.0
+- package: google.golang.org/grpc
+  version: ^1.7.1

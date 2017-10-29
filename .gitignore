@@ -31,3 +31,4 @@ _testmain.go
 /machine*
 /bin
 /vendor
+.DS_Store

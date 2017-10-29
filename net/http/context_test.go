@@ -25,6 +25,7 @@ func TestDefaultBehaviour(t *testing.T) {
 
 	// Build handler
 	h := http.NewServer()
+	defer h.Drain()
 	var gotContext journey.Ctx
 	h.HandleFunc("/test", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
@@ -223,7 +224,7 @@ func TestPropagateContext(t *testing.T) {
 }
 
 func startServer(appCtx app.Ctx, h *http.Server) string {
-	addr := fmt.Sprintf("127.0.0.1:%d", portSequence.next())
+	addr := fmt.Sprintf("127.0.0.1:%d", lt.NextPort())
 	h.HandleFunc("/preflight", http.GET, func(
 		ctx journey.Ctx, w http.ResponseWriter, r *http.Request,
 	) {
