@@ -34,6 +34,9 @@ func TestClientServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.PropagateContext = true
+	if err := c.WaitForStateReady(appCtx); err != nil {
+		t.Fatal(err)
+	}
 	testClient := NewTestClient(c.GRPC)
 
 	// Prepare context

@@ -6,9 +6,12 @@ import (
 	"io/ioutil"
 
 	"github.com/pkg/errors"
+	"github.com/stairlin/lego/ctx"
 	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/log"
 	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -30,12 +33,12 @@ type Client struct {
 func NewClient(
 	appCtx app.Ctx, target string, opts ...grpc.DialOption,
 ) (*Client, error) {
+	appCtx.Trace("c.grpc.dial", "Dialing...", log.String("target", target))
 	client := &Client{}
 
 	// Add default dial options
 	opts = append(opts,
 		grpc.WithUnaryInterceptor(client.unaryInterceptor),
-		grpc.WithBlock(),
 	)
 
 	// Dial GRPC connection
@@ -49,6 +52,24 @@ func NewClient(
 
 func (c *Client) AppendUnaryMiddleware(m UnaryClientMiddleware) {
 	c.unaryMiddlewares = append(c.unaryMiddlewares, m)
+}
+
+// WaitForStateReady waits until the connection is ready or the context
+// times out
+func (c *Client) WaitForStateReady(ctx ctx.Ctx) error {
+	s := c.GRPC.GetState()
+	if s == connectivity.Ready {
+		return nil
+	}
+
+	ctx.Trace("c.grpc.wait", "Wait for connection to be ready",
+		log.Stringer("state", s),
+	)
+	if !c.GRPC.WaitForStateChange(ctx, s) {
+		// ctx got timeout or canceled.
+		return ctx.Err()
+	}
+	return nil
 }
 
 func (c *Client) Close() error {
