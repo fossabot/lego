@@ -212,7 +212,7 @@ func (s *Server) unaryInterceptor(
 		context = journey.New(s.app)
 	}
 	ctx := context.(journey.Ctx)
-	ctx.Store("Start-Time", time.Now())
+	ctx.Store("Start-Time", time.Now().UnixNano())
 
 	// Build middleware chain and then call it
 	next := func(ctx journey.Ctx, req interface{}) (interface{}, error) {
@@ -244,9 +244,10 @@ func mwServerLogging(next UnaryHandler) UnaryHandler {
 		// Next middleware
 		res, err := next(ctx, req)
 
-		startTime := ctx.Load("Start-Time").(time.Time)
+		startTime := ctx.Load("Start-Time").(int64)
+		duration := time.Duration(time.Now().UnixNano() - startTime)
 		ctx.Trace("h.grpc.req.end", "Request end",
-			log.Duration("duration", time.Since(startTime)),
+			log.Duration("duration", duration),
 			log.Error(err),
 		)
 		return res, err
@@ -264,9 +265,10 @@ func mwServerStats(next UnaryHandler) UnaryHandler {
 		// Next middleware
 		res, err := next(ctx, req)
 
-		startTime := ctx.Load("Start-Time").(time.Time)
+		startTime := ctx.Load("Start-Time").(int64)
+		duration := time.Duration(time.Now().UnixNano() - startTime)
 		ctx.Stats().Histogram("grpc.call", 1, tags)
-		ctx.Stats().Timing("grpc.time", time.Since(startTime), tags)
+		ctx.Stats().Timing("grpc.time", duration, tags)
 		ctx.Stats().Dec("grpc.conc", tags)
 		return res, err
 	}
