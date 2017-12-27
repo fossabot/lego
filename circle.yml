@@ -19,6 +19,6 @@ test:
   pre:
     - mkdir -p "$IMPORT_PATH"
     - ln -sf "$(pwd)" "$APP_PATH"
-    - cd "$APP_PATH" && dep ensure
+    - cd "$APP_PATH" && /usr/local/dep ensure
   override:
     - cd "$APP_PATH" && make test
