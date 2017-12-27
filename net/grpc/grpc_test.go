@@ -189,7 +189,8 @@ func TestDrain(t *testing.T) {
 		t.Fatal("expect to get an error the the server is draining")
 	}
 	if !strings.Contains(err.Error(), "grpc: the connection is unavailable") &&
-		!strings.Contains(err.Error(), "transport is closing") {
+		!strings.Contains(err.Error(), "transport is closing") &&
+		!strings.Contains(err.Error(), "all SubConns are in TransientFailure") {
 		t.Errorf("unexpected error %s", err)
 	}
 }
