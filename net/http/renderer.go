@@ -87,6 +87,17 @@ func (r *RenderData) Render(res ResponseWriter) error {
 	return err
 }
 
+type RenderContent struct {
+	Req     *http.Request
+	Modtime time.Time
+	Content io.ReadSeeker
+}
+
+func (r *RenderContent) Render(res ResponseWriter) error {
+	http.ServeContent(res, r.Req, "", r.Modtime, r.Content)
+	return nil
+}
+
 type RenderConditional struct {
 	Req          *http.Request
 	ETag         string
