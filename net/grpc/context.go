@@ -1,10 +1,11 @@
 package grpc
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"
-	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -15,7 +16,7 @@ const contextMD = "lego-journey-bin"
 var ErrMissingJourney = errors.New("missing journey")
 
 // ExtractContext extracts journey from a generic context
-func ExtractContext(context netcontext.Context, app app.Ctx) (journey.Ctx, error) {
+func ExtractContext(context context.Context, app app.Ctx) (journey.Ctx, error) {
 	md, ok := metadata.FromIncomingContext(context)
 	if !ok {
 		return nil, errors.New("missing metadata")
@@ -33,7 +34,7 @@ func ExtractContext(context netcontext.Context, app app.Ctx) (journey.Ctx, error
 }
 
 // EmbedContext embeds a journey into a generic context
-func EmbedContext(ctx netcontext.Context) (netcontext.Context, error) {
+func EmbedContext(ctx context.Context) (context.Context, error) {
 	j, ok := ctx.(journey.Ctx)
 	if !ok {
 		return ctx, nil

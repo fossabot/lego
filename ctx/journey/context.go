@@ -7,13 +7,12 @@
 package journey
 
 import (
+	goc "context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	netCtx "golang.org/x/net/context"
-
 	"github.com/stairlin/lego/bg"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx"
@@ -52,7 +51,7 @@ type Ctx interface {
 type context struct {
 	app        app.Ctx
 	logger     log.Logger
-	net        netCtx.Context
+	c          goc.Context
 	cancelFunc func()
 
 	Type    Type
@@ -178,18 +177,18 @@ func (c *context) RangeValues(f func(key, value interface{}) bool) {
 // Deadline returns the time when work done on behalf of this context
 // should be canceled. Deadline returns ok==false when no deadline is
 // set. Successive calls to Deadline return the same results.
-func (c *context) Deadline() (deadline time.Time, ok bool) { return c.net.Deadline() }
+func (c *context) Deadline() (deadline time.Time, ok bool) { return c.c.Deadline() }
 
 // Done returns a channel that's closed when work done on behalf of this
 // context should be canceled. Done may return nil if this context can
 // never be canceled. Successive calls to Done return the same value.
-func (c *context) Done() <-chan struct{} { return c.net.Done() }
+func (c *context) Done() <-chan struct{} { return c.c.Done() }
 
 // Err returns a non-nil error value after Done is closed. Err returns
 // Canceled if the context was canceled or DeadlineExceeded if the
 // context's deadline passed. No other values for Err are defined.
 // After Done is closed, successive calls to Err return the same value.
-func (c *context) Err() error { return c.net.Err() }
+func (c *context) Err() error { return c.c.Err() }
 
 // Value returns the value associated with this context for key, or nil
 // if no value is associated with key. Successive calls to Value with
@@ -200,7 +199,7 @@ func (c *context) Err() error { return c.net.Err() }
 // functions.
 func (c *context) Value(key interface{}) interface{} {
 	c.Trace("ctx.journey.value", "Add net context value", log.Object("value", key))
-	return c.net.Value(key)
+	return c.c.Value(key)
 }
 
 func (c *context) logFields(fields []log.Field) []log.Field {
@@ -249,7 +248,7 @@ func (c *context) BranchOff(t Type) Ctx {
 		ID:         c.ID,
 		Stepper:    c.Stepper.BranchOff(),
 		KV:         c.KV.clone(),
-		net:        nil,
+		c:          nil,
 		app:        c.app,
 		logger:     c.logger,
 		cancelFunc: func() {},
@@ -257,15 +256,15 @@ func (c *context) BranchOff(t Type) Ctx {
 
 	// If we have a root context, we break the context cancellation propagation
 	if t == Root {
-		ctx.net = netCtx.Background()
+		ctx.c = goc.Background()
 		return ctx
 	}
 
 	// Otherwise, create a new net context from its parent
-	if deadline, ok := c.net.Deadline(); ok {
-		ctx.net, ctx.cancelFunc = netCtx.WithDeadline(c.net, deadline)
+	if deadline, ok := c.c.Deadline(); ok {
+		ctx.c, ctx.cancelFunc = goc.WithDeadline(c.c, deadline)
 	} else {
-		ctx.net, ctx.cancelFunc = netCtx.WithCancel(c.net)
+		ctx.c, ctx.cancelFunc = goc.WithCancel(c.c)
 	}
 	return ctx
 }
@@ -287,9 +286,9 @@ func build(ctx app.Ctx) *context {
 
 	reqConfig := c.app.Config().Request
 	if reqConfig.Timeout() != 0 {
-		c.net, c.cancelFunc = netCtx.WithTimeout(c.app, reqConfig.Timeout())
+		c.c, c.cancelFunc = goc.WithTimeout(c.app, reqConfig.Timeout())
 	} else {
-		c.net, c.cancelFunc = netCtx.WithCancel(c.app)
+		c.c, c.cancelFunc = goc.WithCancel(c.app)
 	}
 	return c
 }

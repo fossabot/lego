@@ -1,6 +1,7 @@
 package grpc_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/stairlin/lego/ctx/journey"
 	lgrpc "github.com/stairlin/lego/net/grpc"
 	lt "github.com/stairlin/lego/testing"
-	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -201,7 +201,7 @@ type MyTestServer struct {
 }
 
 func (s *MyTestServer) Hello(
-	context netcontext.Context, req *Request,
+	context context.Context, req *Request,
 ) (*Response, error) {
 	ctx, ok := context.(journey.Ctx)
 	if !ok {

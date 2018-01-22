@@ -1,11 +1,10 @@
 package journey_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
-
-	netCtx "golang.org/x/net/context"
 
 	"github.com/stairlin/lego/ctx/journey"
 	lt "github.com/stairlin/lego/testing"
@@ -96,7 +95,7 @@ func TestCancellation(t *testing.T) {
 	select {
 	case <-j.Done():
 		tt.Log("cancel released the context")
-		expect := netCtx.Canceled
+		expect := context.Canceled
 		if j.Err() != expect {
 			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
 		}
@@ -120,7 +119,7 @@ func TestCancellationPropagation(t *testing.T) {
 		select {
 		case <-ctx.Done():
 			tt.Log("cancel released the context")
-			expect := netCtx.Canceled
+			expect := context.Canceled
 			if ctx.Err() != expect {
 				tt.Errorf("%d - expect error to be <%s>, but got <%s>", i, expect, ctx.Err())
 			}
@@ -141,7 +140,7 @@ func TestTimeout(t *testing.T) {
 	select {
 	case <-j.Done():
 		tt.Log("timeout released the context")
-		expect := netCtx.DeadlineExceeded
+		expect := context.DeadlineExceeded
 		if j.Err() != expect {
 			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
 		}
@@ -161,7 +160,7 @@ func TestEnd(t *testing.T) {
 	select {
 	case <-j.Done():
 		tt.Log("end released the context")
-		expect := netCtx.Canceled
+		expect := context.Canceled
 		if j.Err() != expect {
 			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
 		}

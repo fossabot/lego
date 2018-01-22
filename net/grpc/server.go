@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -13,7 +14,6 @@ import (
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/log"
-	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
@@ -191,7 +191,7 @@ func (s *Server) isDraining() bool {
 }
 
 func (s *Server) unaryInterceptor(
-	context netcontext.Context,
+	context context.Context,
 	req interface{},
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,

@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"io/ioutil"
@@ -9,7 +10,6 @@ import (
 	"github.com/stairlin/lego/ctx"
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/log"
-	netcontext "golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
@@ -128,7 +128,7 @@ func MustDialOption(opt grpc.DialOption, err error) grpc.DialOption {
 // invoker is the handler to complete the RPC and it is the responsibility of
 // the interceptor to call it. This is an EXPERIMENTAL API.
 func (c *Client) unaryInterceptor(
-	ctx netcontext.Context,
+	ctx context.Context,
 	method string,
 	req, reply interface{},
 	cc *grpc.ClientConn,
