@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 	netCtx "golang.org/x/net/context"
 
 	"github.com/stairlin/lego/bg"
@@ -63,7 +63,7 @@ type context struct {
 
 // New creates a new context and returns it
 func New(ctx app.Ctx) Ctx {
-	id := uuid.NewV4().String()
+	id := uuid.New().String()
 
 	// Log to correlate this journey with the current app environment
 	ctx.Trace("ctx.journey.new", "Start journey",

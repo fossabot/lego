@@ -41,7 +41,7 @@
   name = "github.com/pkg/errors"
 
 [[constraint]]
-  name = "github.com/satori/go.uuid"
+  name = "github.com/google/uuid"
 
 [[constraint]]
   name = "golang.org/x/net"
