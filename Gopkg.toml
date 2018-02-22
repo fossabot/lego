@@ -39,12 +39,15 @@
 
 [[constraint]]
   name = "github.com/pkg/errors"
+  version = "0.8.0"
 
 [[constraint]]
   name = "github.com/google/uuid"
+  branch = "master"
 
 [[constraint]]
   name = "golang.org/x/net"
+  branch = "master"
 
 [[constraint]]
   name = "google.golang.org/grpc"
