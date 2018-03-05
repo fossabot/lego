@@ -6,6 +6,8 @@ import (
 
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/disco"
+	da "github.com/stairlin/lego/disco/adapter"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/stats"
 )
@@ -19,15 +21,22 @@ type T struct {
 	logger log.Logger
 	stats  stats.Stats
 	config *config.Config
+	disco  disco.Agent
 }
 
 // New returns a new instance of T
 func New(t *testing.T) *T {
+	config := &config.Config{}
+	disco, err := da.New(config)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return &T{
 		t:      t,
 		logger: NewLogger(t, true),
 		stats:  NewStats(t),
-		config: &config.Config{},
+		config: config,
+		disco:  disco,
 	}
 }
 
@@ -46,9 +55,14 @@ func (t *T) Config() *config.Config {
 	return t.config
 }
 
+// Disco returns a local service discovery agent
+func (t *T) Disco() disco.Agent {
+	return t.disco
+}
+
 // Logger returns a lego logger interface
 func (t *T) NewAppCtx(name string) app.Ctx {
-	return app.NewCtx(name, t.Config(), t.Logger(), t.Stats())
+	return app.NewCtx(name, t.Config(), t.Logger(), t.Stats(), t.Disco())
 }
 
 // DisableStrictMode will stop making error logs failing a test

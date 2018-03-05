@@ -4,15 +4,20 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
+	"strconv"
 	"sync"
 	"syscall"
 
+	"github.com/pkg/errors"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/disco"
+	da "github.com/stairlin/lego/disco/adapter"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/log/logger"
 	"github.com/stairlin/lego/net"
-	statsAdapter "github.com/stairlin/lego/stats/adapter"
+	sa "github.com/stairlin/lego/stats/adapter"
 )
 
 // App is the core structure for a new service
@@ -23,6 +28,7 @@ type App struct {
 	service string
 	ctx     app.Ctx
 	config  *config.Config
+	disco   disco.Agent
 	servers *net.Reg
 	drain   bool
 	done    chan bool
@@ -59,14 +65,20 @@ func NewWithConfig(service string, c *config.Config) (*App, error) {
 	}
 
 	// Build stats
-	s, err := statsAdapter.New(&c.Stats)
+	s, err := sa.New(&c.Stats)
 	if err != nil {
 		return nil, fmt.Errorf("stats error: %s", err)
 	}
 	s.SetLogger(l)
 
+	// Service discovery
+	sd, err := da.New(c)
+	if err != nil {
+		return nil, fmt.Errorf("disco error: %s", err)
+	}
+
 	// Build app context
-	ctx := app.NewCtx(service, c, l, s)
+	ctx := app.NewCtx(service, c, l, s, sd)
 
 	// Build ready cond flag
 	lock := &sync.Mutex{}
@@ -79,6 +91,7 @@ func NewWithConfig(service string, c *config.Config) (*App, error) {
 		ready:   ready,
 		ctx:     ctx,
 		config:  c,
+		disco:   sd,
 		servers: net.NewReg(ctx),
 		done:    make(chan bool, 1),
 	}
@@ -100,6 +113,22 @@ func (a *App) Config() *config.Config {
 
 // Serve allows handlers to serve requests and blocks the call
 func (a *App) Serve() error {
+	defer func() {
+		if recover := recover(); recover != nil {
+			a.Ctx().Error("lego.serve.panic", "App panic",
+				log.Object("err", recover),
+				log.String("stack", string(debug.Stack())),
+			)
+
+			// Attempt to clean resources before propagating the panic further up
+			if !a.drain {
+				a.Drain()
+			}
+
+			panic(recover)
+		}
+	}()
+
 	a.ctx.Trace("lego.serve", "Start serving...")
 
 	err := a.servers.Serve()
@@ -136,8 +165,11 @@ func (a *App) Drain() {
 	a.drain = true
 	a.mu.Unlock()
 
-	a.servers.Drain()  // Block all new requests and drain in-flight requests
-	a.ctx.BG().Drain() // Now drain last background services
+	a.servers.Drain() // Block all new requests and drain in-flight requests
+	a.ctx.Drain()
+
+	a.disco.Leave(a.ctx)
+	a.ctx.Cancel()
 
 	a.done <- true // Release Serve()
 }
@@ -145,6 +177,46 @@ func (a *App) Drain() {
 // Ctx returns the appliation context
 func (a *App) Ctx() app.Ctx {
 	return a.ctx
+}
+
+// RegisterServer adds the given server to the list of managed servers
+func (a *App) RegisterServer(addr string, s net.Server) {
+	a.servers.Add(addr, s)
+}
+
+// ServiceRegistration contains info to register a service
+type ServiceRegistration struct {
+	Name   string
+	Host   string
+	Port   uint16
+	Server net.Server
+	Tags   []string
+}
+
+// RegisterService adds the server to the list of managed servers and registers
+// it to service discovery
+func (a *App) RegisterService(r *ServiceRegistration) error {
+	a.servers.Add(net.JoinHostPort(r.Host, strconv.Itoa(int(r.Port))), r.Server)
+
+	dr := disco.Registration{
+		Name: r.Name,
+		Addr: r.Host,
+		Port: r.Port,
+		Tags: r.Tags,
+	}
+	if _, err := a.disco.Register(a.Ctx(), &dr); err != nil {
+		return errors.Wrap(err, "error registering service")
+	}
+	return nil
+}
+
+// Disco returns the active service discovery agent.
+//
+// When service discovery is disabled, it will return a local agent that acts
+// like a regular service discovery agent, expect that it only registers local
+// services.
+func (a *App) Disco() disco.Agent {
+	return a.disco
 }
 
 func trapSignals(app *App) {

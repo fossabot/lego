@@ -12,24 +12,14 @@ import (
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/log"
-)
-
-const (
-	// down mode is the default state. The handler is not ready to accept
-	// new connections
-	down uint32 = 0
-	// up mode is when a handler accepts connections
-	up uint32 = 1
-	// drain mode is when a handler stops accepting new connection, but wait
-	// for all existing in-flight requests to complete
-	drain uint32 = 2
+	"github.com/stairlin/lego/net"
 )
 
 // A Server defines parameters for running a lego compatible HTTP server
 // The zero value for Server is a valid configuration.
 type Server struct {
-	wg   sync.WaitGroup
-	mode uint32
+	wg    sync.WaitGroup
+	state uint32
 
 	http http.Server
 
@@ -125,13 +115,13 @@ func (s *Server) Serve(addr string, ctx app.Ctx) error {
 		log.Bool("tls", tlsEnabled),
 	)
 
-	atomic.StoreUint32(&s.mode, up)
+	atomic.StoreUint32(&s.state, net.StateUp)
 	var err error
 	if tlsEnabled {
 		err = s.http.ListenAndServeTLS(s.certFile, s.keyFile)
 	}
 	err = s.http.ListenAndServe()
-	atomic.StoreUint32(&s.mode, down)
+	atomic.StoreUint32(&s.state, net.StateDown)
 
 	if err == http.ErrServerClosed {
 		// Suppress error caused by a server Shutdown or Close
@@ -144,14 +134,14 @@ func (s *Server) Serve(addr string, ctx app.Ctx) error {
 // blocked with a 503 and it will block this call until all in-flight requests
 // have been completed
 func (s *Server) Drain() {
-	atomic.StoreUint32(&s.mode, drain)
+	atomic.StoreUint32(&s.state, net.StateDrain)
 	s.wg.Wait()                           // Wait for all in-flight requests to complete
 	s.http.Shutdown(context.Background()) // Then close all idle connections
 }
 
 // isDraining checks whether the handler is draining
-func (s *Server) isDraining() bool {
-	return atomic.LoadUint32(&s.mode) == drain
+func (s *Server) isState(state uint32) bool {
+	return atomic.LoadUint32(&s.state) == uint32(state)
 }
 
 func (s *Server) buildHandleFunc(app app.Ctx, e Endpoint) func(
@@ -193,7 +183,7 @@ func (s *Server) buildHandleFunc(app app.Ctx, e Endpoint) func(
 			ctx = journey.New(app)
 		}
 
-		if s.isDraining() {
+		if s.isState(net.StateDrain) {
 			ctx.Trace("http.draining", "Handler is draining")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return

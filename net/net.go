@@ -3,10 +3,22 @@ package net
 import (
 	"errors"
 	"fmt"
+	"net"
 	"sync"
 
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/log"
+)
+
+const (
+	// StateDown mode is the default state. The handler is not ready to accept
+	// new connections
+	StateDown uint32 = iota
+	// StateUp mode is when a handler accepts connections
+	StateUp
+	// StateDrain mode is when a handler stops accepting new connection, but wait
+	// for all existing in-flight requests to complete
+	StateDrain
 )
 
 // ErrEmptyReg is the error returned when there are no servers registered
@@ -150,4 +162,13 @@ func (r *Reg) register(addr string, s Server) error {
 
 func (r *Reg) deregister(addr string) {
 	delete(r.l, addr)
+}
+
+// JoinHostPort combines host and port into a network address of the
+// form "host:port". If host contains a colon, as found in literal
+// IPv6 addresses, then JoinHostPort returns "[host]:port".
+//
+// See func Dial for a description of the host and port parameters.
+func JoinHostPort(host, port string) string {
+	return net.JoinHostPort(host, port)
 }

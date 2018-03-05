@@ -8,10 +8,20 @@ import (
 type Config struct {
 	Node    string      `json:"node"`
 	Version string      `json:"version"`
+	Disco   Disco       `json:"disco"`
 	Request Request     `json:"request"`
 	Log     Log         `json:"log"`
 	Stats   Stats       `json:"stats"`
 	App     interface{} `json:"app"`
+}
+
+// Disco contains the configuration to start a service discovery agent
+type Disco struct {
+	On            bool              `json:"on"`
+	AdvertiseAddr string            `json:"advertise_addr"`
+	DefaultTags   []string          `json:"default_tags"`
+	Adapter       string            `json:"adapter"`
+	Config        map[string]string `json:"config"`
 }
 
 // Log contains all log-related configuration

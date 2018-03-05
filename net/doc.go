@@ -2,6 +2,8 @@
 //
 // I defines interfaces shared by other packages that accept or send requests
 // Packages that implement these interfaces include:
+//  * net/cache
+//  * net/grpc
 //  * net/http
 //
 // It also manages the lifecycle of the handlers. All handlers should be

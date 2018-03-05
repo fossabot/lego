@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/stairlin/lego/bg"
+	"github.com/stairlin/lego/cache"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx"
+	"github.com/stairlin/lego/disco"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/stats"
 )
@@ -24,21 +26,35 @@ type Ctx interface {
 	L() log.Logger
 	Config() *config.Config
 	BG() *bg.Reg
+	Disco() disco.Agent
+	Cache() cache.Cache
+	SetCache(cache.Cache)
+	Drain()
+	Cancel()
 }
 
 // context holds the application context
 type context struct {
-	appConfig *config.Config
-	bgReg     *bg.Reg
-	c         goc.Context
-	service   string
-	l         log.Logger
-	lFields   []log.Field
-	stats     stats.Stats
+	appConfig  *config.Config
+	bgReg      *bg.Reg
+	disco      disco.Agent
+	cache      cache.Cache
+	c          goc.Context
+	cancelFunc goc.CancelFunc
+	service    string
+	l          log.Logger
+	lFields    []log.Field
+	stats      stats.Stats
 }
 
 // NewCtx creates a new app context
-func NewCtx(service string, c *config.Config, l log.Logger, s stats.Stats) Ctx {
+func NewCtx(
+	service string,
+	c *config.Config,
+	l log.Logger,
+	s stats.Stats,
+	sd disco.Agent,
+) Ctx {
 	// Build background registry
 	reg := bg.NewReg(service, l, s)
 
@@ -48,14 +64,19 @@ func NewCtx(service string, c *config.Config, l log.Logger, s stats.Stats) Ctx {
 		log.String("log_type", "A"),
 	}
 
+	ctx, cancelFunc := goc.WithCancel(goc.Background())
+
 	return &context{
-		service:   service,
-		appConfig: c,
-		bgReg:     reg,
-		c:         goc.Background(),
-		l:         l.AddCalldepth(1),
-		lFields:   lf,
-		stats:     s,
+		service:    service,
+		appConfig:  c,
+		bgReg:      reg,
+		disco:      sd,
+		cache:      cache.New(),
+		c:          ctx,
+		cancelFunc: cancelFunc,
+		l:          l.AddCalldepth(1),
+		lFields:    lf,
+		stats:      s,
 	}
 }
 
@@ -77,6 +98,26 @@ func (c *context) Config() *config.Config {
 
 func (c *context) BG() *bg.Reg {
 	return c.bgReg
+}
+
+func (c *context) Disco() disco.Agent {
+	return c.disco
+}
+
+func (c *context) Cache() cache.Cache {
+	return c.cache
+}
+
+func (c *context) SetCache(ca cache.Cache) {
+	c.cache = ca
+}
+
+func (c *context) Drain() {
+	c.bgReg.Drain()
+}
+
+func (c *context) Cancel() {
+	c.cancelFunc()
 }
 
 // Trace level logs are to follow the code executio step by step
