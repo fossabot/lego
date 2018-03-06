@@ -1,6 +1,6 @@
 machine:
   environment:
-    GODIST: "go1.9.linux-amd64.tar.gz"
+    GODIST: "go1.10.linux-amd64.tar.gz"
     IMPORT_PATH: "/home/ubuntu/.go_workspace/src/github.com/$CIRCLE_PROJECT_USERNAME"
     APP_PATH: "$IMPORT_PATH/$CIRCLE_PROJECT_REPONAME"
   post:
@@ -12,7 +12,7 @@ machine:
     - docker
 dependencies:
   override:
-    - sudo curl -L https://github.com/golang/dep/releases/download/v0.3.2/dep-linux-amd64 > dep
+    - sudo curl -L https://github.com/golang/dep/releases/download/v0.4.1/dep-linux-amd64 > dep
     - sudo chmod 755 dep
     - sudo mv dep /usr/local
 test:
