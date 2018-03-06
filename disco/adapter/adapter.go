@@ -57,7 +57,7 @@ func Register(name string, adapter Adapter) {
 // New creates a new service discovery agent
 func New(config *config.Config) (disco.Agent, error) {
 	if !config.Disco.On {
-		return &localAgent{}, nil
+		return newLocalAgent(), nil
 	}
 
 	mu.RLock()
