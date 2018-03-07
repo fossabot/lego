@@ -15,6 +15,7 @@ import (
 	"github.com/stairlin/lego/cache"
 	"github.com/stairlin/lego/log"
 	netCache "github.com/stairlin/lego/net/cache"
+	"github.com/stairlin/lego/net/naming"
 )
 
 type AppConfig struct {
@@ -58,12 +59,12 @@ func main() {
 	}
 
 	// Listen to service updates
-	service, err := app.Disco().Service(app.Ctx(), "api.cache", tags...)
+	w, err := naming.Disco(app.Ctx(), app.Disco(), tags...).Resolve("api.cache")
 	if err != nil {
-		fmt.Println("Problem fetching service", err)
+		fmt.Println("Problem watching service", err)
 		os.Exit(1)
 	}
-	cacheServer.DiscoverPeers(service)
+	cacheServer.SetOptions(netCache.OptWatcher(w))
 
 	// Cache random data
 	grp := cacheServer.NewGroup("foo", 64<<20, cache.LoadFunc(

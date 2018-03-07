@@ -13,18 +13,18 @@ import (
 	"github.com/golang/groupcache"
 	"github.com/stairlin/lego/cache"
 	"github.com/stairlin/lego/ctx/app"
-	"github.com/stairlin/lego/disco"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/net"
+	"github.com/stairlin/lego/net/naming"
 )
 
 // Server implements net.Server for distributed caching
 type Server struct {
-	state uint32
-	sub   chan *disco.Event
-	unsub func()
-	pool  *groupcache.HTTPPool
-	opts  groupcache.HTTPPoolOptions
+	state   uint32
+	watcher naming.Watcher
+	nodes   map[string]struct{}
+	pool    *groupcache.HTTPPool
+	opts    groupcache.HTTPPoolOptions
 
 	HTTP  http.Server
 	Cache cache.Cache
@@ -33,7 +33,7 @@ type Server struct {
 // NewServer initialises a new Server
 func NewServer(cache cache.Cache) *Server {
 	return &Server{
-		unsub: func() {},
+		nodes: map[string]struct{}{},
 		opts: groupcache.HTTPPoolOptions{
 			BasePath: "/",
 			Replicas: 50,
@@ -60,9 +60,37 @@ func (s *Server) Serve(addr string, ctx app.Ctx) error {
 	s.HTTP.Addr = addr
 	s.HTTP.Handler = r
 
-	// Listen to disco changes
-	if s.sub != nil {
-		ctx.BG().Dispatch(&clustUpdateSvc{server: s})
+	// Watch for updates
+	if s.watcher != nil {
+		go func() {
+			for {
+				updates, err := s.watcher.Next()
+				switch err {
+				case nil:
+				case naming.ErrWatcherClosed:
+					return
+				default:
+					ctx.Warning("s.cache.watch.err", "Watcher returned an error",
+						log.Error(err),
+					)
+				}
+
+				for _, u := range updates {
+					switch u.Op {
+					case naming.Add:
+						s.nodes[u.Addr] = struct{}{}
+					case naming.Delete:
+						delete(s.nodes, u.Addr)
+					}
+				}
+
+				peers := make([]string, 0, len(s.nodes))
+				for n := range s.nodes {
+					peers = append(peers, s.buildURL(n))
+				}
+				s.pool.Set(peers...)
+			}
+		}()
 	}
 
 	ctx.Trace("s.cache.listen", "Listening...", log.String("addr", addr))
@@ -89,7 +117,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Drain implements net.Server
 func (s *Server) Drain() {
 	s.HTTP.Shutdown(context.Background()) // Close all idle connections
-	s.unsub()
+	if s.watcher != nil {
+		s.watcher.Close()
+	}
 }
 
 // SetOptions changes the handler options
@@ -99,16 +129,13 @@ func (s *Server) SetOptions(opts ...Option) {
 	}
 }
 
-func (s *Server) DiscoverPeers(svc disco.Service) {
-	s.sub, s.unsub = svc.Sub()
-}
-
-func (s *Server) UpdatePeers(peers ...string) {
-	s.pool.Set(peers...)
-}
-
 func (s *Server) isState(state uint32) bool {
 	return atomic.LoadUint32(&s.state) == state
+}
+
+func (s *Server) buildURL(node string) string {
+	// TODO: Handle TLS
+	return "http://" + node
 }
 
 // Option allows to configure unexported handler fields
@@ -130,38 +157,9 @@ func OptReplicas(r int) Option {
 	}
 }
 
-// clustUpdateSvc listens to cluster updates and update the cache pool
-type clustUpdateSvc struct {
-	server *Server
-	stop   chan struct{}
-}
-
-// Start starts listening to cluster changes
-func (u *clustUpdateSvc) Start() {
-	u.stop = make(chan struct{}, 1)
-
-	for {
-		select {
-		case e := <-u.server.sub:
-			if e == nil {
-				// Channel closed
-				return
-			}
-			if e.Err != nil {
-				continue
-			}
-
-			var peers []string
-			for _, instance := range e.Instances {
-				peers = append(peers, "http://"+instance.Addr())
-			}
-			u.server.UpdatePeers(peers...)
-		case <-u.stop:
-			return
-		}
+// OptWatcher specifies a watcher to keep the list of peers up to date
+func OptWatcher(w naming.Watcher) Option {
+	return func(s *Server) {
+		s.watcher = w
 	}
-}
-
-func (u *clustUpdateSvc) Stop() {
-	u.stop <- struct{}{}
 }

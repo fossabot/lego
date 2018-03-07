@@ -5,7 +5,7 @@
     "on": true,
     "adapter": "consul",
     "config": {
-      "address": "localhost:32819",
+      "address": "localhost:32824",
       "advertise_address": "127.0.0.1"
     }
   },

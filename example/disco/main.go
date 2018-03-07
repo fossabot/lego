@@ -12,7 +12,6 @@ import (
 
 	"github.com/stairlin/lego"
 	"github.com/stairlin/lego/ctx/journey"
-	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/net/http"
 )
 
@@ -57,18 +56,21 @@ func main() {
 		fmt.Println("Problem getting service", err)
 		os.Exit(1)
 	}
-	sub, unsub := svc.Sub()
+	watcher := svc.Watch()
+	defer watcher.Close()
 	go func() {
 		for {
-			select {
-			case e := <-sub:
-				app.Ctx().Trace("example.disco.event", "Got event",
-					log.Int("instances", len(e.Instances)),
-				)
+			events, err := watcher.Next()
+			if err != nil {
+				fmt.Println("Watcher error", err)
+				return
+			}
+
+			for _, e := range events {
+				fmt.Println("Event", e)
 			}
 		}
 	}()
-	defer unsub()
 
 	// Start serving requests
 	err = app.Serve()

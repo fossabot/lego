@@ -32,8 +32,8 @@ type Agent interface {
 type Service interface {
 	// Name returns the unique name of a service
 	Name() string
-	// Sub subscribe to events related to the service
-	Sub() (sub chan *Event, unsub func())
+	// Watch listens to service updates
+	Watch() Watcher
 	// Instances returns all available instances of the service
 	Instances() []*Instance
 }
@@ -58,10 +58,4 @@ type Registration struct {
 	Addr string
 	Port uint16
 	Tags []string
-}
-
-// An Event carries a service update that is delivered to all subscribers
-type Event struct {
-	Instances []*Instance
-	Err       error
 }

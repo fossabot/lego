@@ -28,50 +28,56 @@ func newLocalAgent() disco.Agent {
 }
 
 func (a *localAgent) Register(ctx ctx.Ctx, r *disco.Registration) (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	id := uuid.New().String()
 	if _, ok := a.Registry[id]; ok {
 		return "", errors.New("service already registered")
 	}
-	a.Registry[id] = &disco.Instance{
+	instance := &disco.Instance{
 		ID:   id,
 		Name: r.Name,
 		Host: r.Addr,
 		Port: r.Port,
 		Tags: r.Tags,
 	}
-	return "", nil
+	a.Registry[id] = instance
+
+	// Notifiy subscribers
+	for sub := range a.Subs {
+		sub <- &disco.Event{
+			Op:       disco.Add,
+			Instance: instance,
+		}
+	}
+
+	return id, nil
 }
 
 func (a *localAgent) Deregister(ctx ctx.Ctx, id string) error {
-	delete(a.Registry, id)
-	return nil
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	return a.deregister(ctx, id)
 }
 
 func (a *localAgent) Services(
 	ctx ctx.Ctx, tags ...string,
 ) (map[string]disco.Service, error) {
-	services := map[string]disco.Service{}
-	for _, instance := range a.Registry {
-		services[instance.Name] = &service{
-			name:      instance.Name,
-			instances: []*disco.Instance{instance},
-			sub: func() (sub chan *disco.Event, unsub func()) {
-				sub = make(chan *disco.Event)
-				unsub = func() {
-					delete(a.Subs, sub)
-				}
-				a.Subs[sub] = struct{}{}
-				return sub, unsub
-			},
-		}
-	}
-	return services, nil
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	return a.services(ctx, tags...)
 }
 
 func (a *localAgent) Service(
 	ctx ctx.Ctx, name string, tags ...string,
 ) (disco.Service, error) {
-	services, err := a.Services(ctx, tags...)
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
+	services, err := a.services(ctx, tags...)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +93,7 @@ func (a *localAgent) Leave(ctx ctx.Ctx) {
 	defer a.mu.Unlock()
 
 	for id := range a.Registry {
-		err := a.Deregister(ctx, id)
+		err := a.deregister(ctx, id)
 		if err != nil {
 			ctx.Warning("disco.leave.failure", "Could not de-register service",
 				log.String("service_id", id),
@@ -98,21 +104,82 @@ func (a *localAgent) Leave(ctx ctx.Ctx) {
 	a.Subs = map[chan *disco.Event]struct{}{}
 }
 
+func (a *localAgent) services(
+	ctx ctx.Ctx, tags ...string,
+) (map[string]disco.Service, error) {
+	services := map[string]disco.Service{}
+	for _, instance := range a.Registry {
+		services[instance.Name] = &service{
+			name:      instance.Name,
+			instances: []*disco.Instance{instance},
+			watch: func() disco.Watcher {
+				sub := make(chan *disco.Event, 1)
+				unsub := func() {
+					delete(a.Subs, sub)
+				}
+				a.Subs[sub] = struct{}{}
+				return &watcher{
+					sub:   sub,
+					unsub: unsub,
+				}
+			},
+		}
+	}
+	return services, nil
+}
+
+func (a *localAgent) deregister(ctx ctx.Ctx, id string) error {
+	instance, ok := a.Registry[id]
+	if !ok {
+		return nil
+	}
+	delete(a.Registry, id)
+
+	// Notifiy subscribers
+	for sub := range a.Subs {
+		sub <- &disco.Event{
+			Op:       disco.Delete,
+			Instance: instance,
+		}
+	}
+
+	return nil
+}
+
 // service implements disco.Service
 type service struct {
 	name      string
 	instances []*disco.Instance
-	sub       func() (sub chan *disco.Event, unsub func())
+	watch     func() disco.Watcher
 }
 
 func (s *service) Name() string {
 	return s.name
 }
 
-func (s *service) Sub() (sub chan *disco.Event, unsub func()) {
-	return s.sub()
+func (s *service) Watch() disco.Watcher {
+	return s.watch()
 }
 
 func (s *service) Instances() []*disco.Instance {
 	return s.instances
+}
+
+type watcher struct {
+	sub   chan *disco.Event
+	unsub func()
+}
+
+func (w *watcher) Next() ([]*disco.Event, error) {
+	e, ok := <-w.sub
+	if !ok {
+		return nil, disco.ErrWatcherClosed
+	}
+	return []*disco.Event{e}, nil
+}
+
+func (w *watcher) Close() error {
+	w.unsub()
+	close(w.sub)
+	return nil
 }

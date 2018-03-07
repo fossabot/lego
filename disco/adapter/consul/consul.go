@@ -5,6 +5,7 @@
 package consul
 
 import (
+	"context"
 	"sort"
 	"strings"
 	"sync"
@@ -40,13 +41,12 @@ func New(c *config.Config, params map[string]string) (disco.Agent, error) {
 		consulConfig: cc,
 		appConfig:    c,
 		serviceIDs:   map[string]struct{}{},
-		subs:         map[chan *disco.Event]struct{}{},
 		advertAddr:   config.ValueOf(params["advertise_address"]),
 	}, nil
 }
 
 type Agent struct {
-	mu sync.RWMutex
+	mu sync.Mutex
 
 	consul       *api.Client
 	consulConfig *api.Config
@@ -55,8 +55,6 @@ type Agent struct {
 
 	// serviceIDs caches the list of services registered
 	serviceIDs map[string]struct{}
-	// subs contains all event subscriptions
-	subs map[chan *disco.Event]struct{}
 }
 
 func (a *Agent) Register(ctx ctx.Ctx, r *disco.Registration) (string, error) {
@@ -84,7 +82,9 @@ func (a *Agent) Register(ctx ctx.Ctx, r *disco.Registration) (string, error) {
 		return "", err
 	}
 
+	a.mu.Lock()
 	a.serviceIDs[reg.ID] = struct{}{}
+	a.mu.Unlock()
 	return reg.ID, nil
 }
 
@@ -99,7 +99,9 @@ func (a *Agent) Deregister(ctx ctx.Ctx, id string) error {
 		return err
 	}
 
+	a.mu.Lock()
 	delete(a.serviceIDs, id)
+	a.mu.Unlock()
 	return nil
 }
 
@@ -121,8 +123,8 @@ func (a *Agent) Services(
 		if !ok {
 			v = &service{
 				name: s.Service,
-				sub: func() (sub chan *disco.Event, unsub func()) {
-					return a.sub(ctx, s.Service, tags...)
+				watch: func() disco.Watcher {
+					return a.watch(ctx, s.Service, tags...)
 				},
 			}
 			svcs[s.Service] = v
@@ -151,16 +153,13 @@ func (a *Agent) Service(
 	return &service{
 		name:      name,
 		instances: instances,
-		sub: func() (sub chan *disco.Event, unsub func()) {
-			return a.sub(ctx, name, tags...)
+		watch: func() disco.Watcher {
+			return a.watch(ctx, name, tags...)
 		},
 	}, nil
 }
 
 func (a *Agent) Leave(ctx ctx.Ctx) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
 	for id := range a.serviceIDs {
 		err := a.Deregister(ctx, id)
 		if err != nil {
@@ -169,53 +168,31 @@ func (a *Agent) Leave(ctx ctx.Ctx) {
 			)
 		}
 	}
+
+	a.mu.Lock()
 	a.serviceIDs = map[string]struct{}{}
+	a.mu.Unlock()
 }
 
-func (a *Agent) sub(
-	ctx ctx.Ctx, name string, tags ...string,
-) (sub chan *disco.Event, unsub func()) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	// Create subscription
-	sub = make(chan *disco.Event)
-	unsub = func() {
-		delete(a.subs, sub)
-	}
-	a.subs[sub] = struct{}{}
-
-	// Start polling Consul
+func (a *Agent) watch(
+	ctx context.Context, name string, tags ...string,
+) disco.Watcher {
 	var waitIndex uint64
-	go func() {
-		for {
-			q := a.buildQueryOptions()
-			q.WaitIndex = waitIndex
-			instances, meta, err := a.service(ctx, name, q, tags...)
-
-			var e *disco.Event
-			if err != nil {
-				e = &disco.Event{
-					Err: err,
-				}
-			} else {
-				waitIndex = meta.LastIndex
-				e = &disco.Event{
-					Instances: instances,
-				}
-			}
-
-			select {
-			case <-ctx.Done():
-			case sub <- e:
-			}
+	next := func(ctx context.Context) ([]*disco.Instance, error) {
+		q := a.buildQueryOptions()
+		q.WaitIndex = waitIndex
+		instances, meta, err := a.service(ctx, name, q, tags...)
+		if err != nil {
+			return nil, err
 		}
-	}()
-	return sub, unsub
+		waitIndex = meta.LastIndex
+		return instances, nil
+	}
+	return newWatcher(ctx, next)
 }
 
 func (a *Agent) service(
-	ctx ctx.Ctx, name string, q *api.QueryOptions, tags ...string,
+	ctx context.Context, name string, q *api.QueryOptions, tags ...string,
 ) ([]*disco.Instance, *api.QueryMeta, error) {
 	var tag string
 	if len(tags) > 0 {
@@ -255,19 +232,55 @@ func (a *Agent) buildQueryOptions() *api.QueryOptions {
 type service struct {
 	name      string
 	instances []*disco.Instance
-	sub       func() (sub chan *disco.Event, unsub func())
+	watch     func() disco.Watcher
 }
 
 func (s *service) Name() string {
 	return s.name
 }
 
-func (s *service) Sub() (sub chan *disco.Event, unsub func()) {
-	return s.sub()
+func (s *service) Watch() disco.Watcher {
+	return s.watch()
 }
 
 func (s *service) Instances() []*disco.Instance {
 	return s.instances
+}
+
+type watcher struct {
+	next   func(context.Context) ([]*disco.Instance, error)
+	ctx    context.Context
+	cancel func()
+
+	diff disco.Diff
+}
+
+func newWatcher(
+	ctx context.Context, n func(context.Context) ([]*disco.Instance, error),
+) *watcher {
+	child, cancelFunc := context.WithCancel(ctx)
+	return &watcher{
+		next:   n,
+		ctx:    child,
+		cancel: cancelFunc,
+	}
+}
+
+func (w *watcher) Next() ([]*disco.Event, error) {
+	if w.ctx.Err() != nil {
+		return nil, disco.ErrWatcherClosed
+	}
+
+	instances, err := w.next(w.ctx)
+	if err != nil {
+		return nil, err
+	}
+	return w.diff.Apply(instances), nil
+}
+
+func (w *watcher) Close() error {
+	w.cancel()
+	return nil
 }
 
 // isSubset returns whether b is a subset of a
