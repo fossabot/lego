@@ -1,29 +1,39 @@
 package naming
 
 import (
-	"github.com/stairlin/lego/ctx"
+	"net/url"
+
+	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/disco"
 )
 
 // Disco creates a Disco Resolver that uses service discovery to find
 // available instances.
 // It also creates watchers that listen to service discovery updates
-func Disco(ctx ctx.Ctx, disco disco.Agent, tags ...string) Resolver {
+func Disco(ctx app.Ctx, tags ...string) Resolver {
 	return &discoResolver{
-		ctx:   ctx,
-		disco: disco,
-		tags:  tags,
+		ctx:  ctx,
+		tags: tags,
 	}
 }
 
+func buildDisco(ctx app.Ctx, uri *url.URL) (Watcher, error) {
+	var tags []string
+	for _, t := range uri.Query()["tag"] {
+		if t != "" {
+			tags = append(tags, t)
+		}
+	}
+	return Disco(ctx, tags...).Resolve(uri.Host)
+}
+
 type discoResolver struct {
-	ctx   ctx.Ctx
-	disco disco.Agent
-	tags  []string
+	ctx  app.Ctx
+	tags []string
 }
 
 func (r *discoResolver) Resolve(target string) (Watcher, error) {
-	svc, err := r.disco.Service(r.ctx, target, r.tags...)
+	svc, err := r.ctx.Disco().Service(r.ctx, target, r.tags...)
 	if err != nil {
 		return nil, err
 	}

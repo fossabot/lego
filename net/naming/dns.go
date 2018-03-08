@@ -5,13 +5,15 @@ package naming
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stairlin/lego/ctx"
+	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/log"
 )
 
@@ -31,11 +33,24 @@ var (
 // DNS creates a DNS Resolver that can resolve DNS names, and create watchers
 // that poll the DNS server using the frequency set by freq or the default
 // frequency defined by defaultFreq.
-func DNS(ctx ctx.Ctx, freq ...time.Duration) (Resolver, error) {
+func DNS(ctx app.Ctx, freq ...time.Duration) Resolver {
 	if len(freq) > 0 {
-		return &dnsResolver{ctx: ctx, freq: freq[0]}, nil
+		return &dnsResolver{ctx: ctx, freq: freq[0]}
 	}
-	return &dnsResolver{ctx: ctx, freq: defaultFreq}, nil
+	return &dnsResolver{ctx: ctx, freq: defaultFreq}
+}
+
+func buildDNS(ctx app.Ctx, uri *url.URL) (Watcher, error) {
+	fp := uri.Query().Get("freq")
+	if fp == "" {
+		return DNS(ctx).Resolve(uri.Host)
+	}
+
+	f, err := strconv.ParseInt(fp, 10, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing DNS update frequency")
+	}
+	return DNS(ctx, time.Duration(f)).Resolve(uri.Host)
 }
 
 // dnsResolver handles name resolution for names following the DNS scheme
@@ -110,26 +125,6 @@ func (i *ipWatcher) Close() error {
 	return nil
 }
 
-// AddressType indicates the address type returned by name resolution.
-type AddressType uint8
-
-const (
-	// Backend indicates the server is a backend server.
-	Backend AddressType = iota
-	// GRPCLB indicates the server is a grpclb load balancer.
-	GRPCLB
-)
-
-// AddrMetadataGRPCLB contains the information the name resolver for grpclb should provide. The
-// name resolver used by the grpclb balancer is required to provide this type of metadata in
-// its address updates.
-type AddrMetadataGRPCLB struct {
-	// AddrType is the type of server (grpc load balancer or backend).
-	AddrType AddressType
-	// ServerName is the name of the grpc load balancer. Used for authentication.
-	ServerName string
-}
-
 // compileUpdate compares the old resolved addresses and newly resolved addresses,
 // and generates an update list
 func (w *dnsWatcher) compileUpdate(newAddrs map[string]*Update) []*Update {
@@ -152,7 +147,9 @@ func (w *dnsWatcher) lookupSRV() map[string]*Update {
 	newAddrs := make(map[string]*Update)
 	_, srvs, err := lookupSRV(w.ctx, defaultSRV, "tcp", w.host)
 	if err != nil {
-		w.logger.Trace("naming.dns", "Failed dns SRV record lookup", log.Error(err))
+		w.logger.Warning("naming.dns.fail", "Failed dns SRV record lookup",
+			log.Error(err),
+		)
 		return nil
 	}
 	for _, s := range srvs {
@@ -174,8 +171,7 @@ func (w *dnsWatcher) lookupSRV() map[string]*Update {
 				continue
 			}
 			addr := a + ":" + strconv.Itoa(int(s.Port))
-			newAddrs[addr] = &Update{Addr: addr,
-				Metadata: AddrMetadataGRPCLB{AddrType: GRPCLB, ServerName: s.Target}}
+			newAddrs[addr] = &Update{Addr: addr}
 		}
 	}
 	return newAddrs

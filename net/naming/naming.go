@@ -1,6 +1,8 @@
 package naming
 
-import "errors"
+import (
+	"github.com/pkg/errors"
+)
 
 // Resolver creates a Watcher for a target to track its resolution changes.
 type Resolver interface {

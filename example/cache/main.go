@@ -41,7 +41,7 @@ func main() {
 		fmt.Println("Problem parsing port", err)
 		os.Exit(1)
 	}
-	tags := []string{"api", "cache", app.Config().Version}
+	tags := []string{"v1"}
 
 	// Register cache service
 	cacheServer := netCache.NewServer(app.Ctx().Cache())
@@ -59,9 +59,9 @@ func main() {
 	}
 
 	// Listen to service updates
-	w, err := naming.Disco(app.Ctx(), app.Disco(), tags...).Resolve("api.cache")
+	w, err := naming.Resolve(app.Ctx(), "disco://api.cache?tag=v1")
 	if err != nil {
-		fmt.Println("Problem watching service", err)
+		fmt.Println("Problem building watcher", err)
 		os.Exit(1)
 	}
 	cacheServer.SetOptions(netCache.OptWatcher(w))
