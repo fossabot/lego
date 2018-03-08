@@ -99,7 +99,7 @@ func TestCancellation(t *testing.T) {
 		if j.Err() != expect {
 			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
 		}
-	case <-time.After(time.Microsecond * 250):
+	case <-time.After(time.Second):
 		tt.Error("expect cancel to release the context")
 	}
 }
