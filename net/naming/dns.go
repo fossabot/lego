@@ -50,7 +50,7 @@ func buildDNS(ctx app.Ctx, uri *url.URL) (Watcher, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing DNS update frequency")
 	}
-	return DNS(ctx, time.Duration(f)).Resolve(uri.Host)
+	return DNS(ctx, time.Second*time.Duration(f)).Resolve(uri.Host)
 }
 
 // dnsResolver handles name resolution for names following the DNS scheme
