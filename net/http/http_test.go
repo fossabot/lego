@@ -97,7 +97,7 @@ func TestHTTPS(t *testing.T) {
 		switch {
 		case strings.Contains(err.Error(), "cannot validate certificate"):
 			t.Fatal("got a bad certificate")
-		case strings.HasSuffix(err.Error(), "getsockopt: connection refused"):
+		case strings.HasSuffix(err.Error(), "connection refused"):
 			t.Log("handler not ready")
 		default:
 			t.Fatalf("got unexpected error %s", err.Error())
