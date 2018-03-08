@@ -182,11 +182,11 @@ func TestDrain(t *testing.T) {
 	ctx.Store("flag", 3)
 
 	// Start draining server
-	go h.Drain()
+	h.Drain()
 
 	_, err = testClient.Hello(ctx, &Request{Msg: "Ping"})
 	if err == nil {
-		t.Fatal("expect to get an error the the server is draining")
+		t.Fatal("expect to get an error when the server is drained")
 	}
 	if !strings.Contains(err.Error(), "grpc: the connection is unavailable") &&
 		!strings.Contains(err.Error(), "transport is closing") &&
