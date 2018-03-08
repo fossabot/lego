@@ -232,7 +232,7 @@ func startServer(appCtx app.Ctx, h *lgrpc.Server) string {
 			panic(err)
 		}
 	}()
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	return addr
 }
