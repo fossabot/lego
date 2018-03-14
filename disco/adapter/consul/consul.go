@@ -41,7 +41,7 @@ func New(c *config.Config, params map[string]string) (disco.Agent, error) {
 		consulConfig: cc,
 		appConfig:    c,
 		serviceIDs:   map[string]struct{}{},
-		advertAddr:   config.ValueOf(params["advertise_address"]),
+		advertAddr:   config.ValueOf(c.Disco.AdvertiseAddr),
 	}, nil
 }
 
@@ -74,7 +74,7 @@ func (a *Agent) Register(ctx ctx.Ctx, r *disco.Registration) (string, error) {
 		Address: r.Addr,
 		Tags:    tags,
 	}
-	if reg.Address == "" {
+	if a.advertAddr != "" {
 		reg.Address = a.advertAddr
 	}
 	err := a.consul.Agent().ServiceRegister(&reg)

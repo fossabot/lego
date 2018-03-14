@@ -4,9 +4,9 @@
   "disco": {
     "on": true,
     "adapter": "consul",
+    "advertise_address": "api.loop",
     "config": {
-      "address": "localhost:32824",
-      "advertise_address": "api.loop"
+      "address": "localhost:32824"
     }
   },
   "log": {
