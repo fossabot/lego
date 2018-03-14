@@ -1,0 +1,28 @@
+{
+  "node": "$NODE_NAME",
+  "version": "test",
+  "disco": {
+    "on": true,
+    "adapter": "consul",
+    "advertise_address": "127.0.0.1",
+    "config": {
+      "address": "localhost:32824"
+    }
+  },
+  "log": {
+    "level": "trace",
+    "formatter": {
+      "adapter": "logf"
+    },
+    "printer": {
+      "adapter": "stdout"
+    }
+  },
+  "stats": {
+    "on": false
+  },
+  "request": {
+    "timeout_ms": 500
+  },
+  "app": {}
+}
