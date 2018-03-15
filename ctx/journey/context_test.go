@@ -123,7 +123,7 @@ func TestCancellationPropagation(t *testing.T) {
 			if ctx.Err() != expect {
 				tt.Errorf("%d - expect error to be <%s>, but got <%s>", i, expect, ctx.Err())
 			}
-		case <-time.After(time.Microsecond * 250):
+		case <-time.After(time.Second):
 			tt.Errorf("%d - expect cancel to release the context", i)
 		}
 	}
@@ -164,7 +164,7 @@ func TestEnd(t *testing.T) {
 		if j.Err() != expect {
 			tt.Errorf("expect error to be <%s>, but got <%s>", expect, j.Err())
 		}
-	case <-time.After(time.Microsecond * 250):
+	case <-time.After(time.Second):
 		tt.Error("expect cancel to release the context")
 	}
 }
@@ -185,7 +185,7 @@ func TestBG_Context(t *testing.T) {
 		if c == j {
 			tt.Error("expect BG context to be different than parent context")
 		}
-	case <-time.After(time.Microsecond * 250):
+	case <-time.After(time.Second):
 		tt.Error("expect to receive context, but got nothing")
 	}
 }
