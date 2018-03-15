@@ -221,7 +221,17 @@ func (a *App) Disco() disco.Agent {
 
 func trapSignals(app *App) {
 	ch := make(chan os.Signal, 10)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
+	signals := []os.Signal{
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGQUIT,
+		syscall.SIGABRT,
+		syscall.SIGKILL,
+		syscall.SIGTERM,
+		syscall.SIGUSR1,
+		syscall.SIGUSR2,
+	}
+	signal.Notify(ch, signals...)
 
 	for {
 		sig := <-ch
@@ -232,7 +242,7 @@ func trapSignals(app *App) {
 			app.Drain() // start draining handlers
 			signal.Stop(ch)
 			return
-		case syscall.SIGKILL:
+		default:
 			signal.Stop(ch)
 			return
 		}
