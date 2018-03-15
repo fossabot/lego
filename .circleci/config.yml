@@ -1,0 +1,16 @@
+# Golang CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-go/ for more details
+defaults: &defaults
+  working_directory: /go/src/github.com/stairlin/lego
+  docker:
+    - image: circleci/golang:1.10
+
+version: 2
+jobs:
+  test:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: go get -v -t -d ./...
+      - run: make test
