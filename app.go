@@ -7,6 +7,7 @@ import (
 	"runtime/debug"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -20,6 +21,12 @@ import (
 	sa "github.com/stairlin/lego/stats/adapter"
 )
 
+const (
+	down uint32 = iota
+	up
+	drain
+)
+
 // App is the core structure for a new service
 type App struct {
 	mu    sync.Mutex
@@ -30,8 +37,9 @@ type App struct {
 	config  *config.Config
 	disco   disco.Agent
 	servers *net.Reg
-	drain   bool
-	done    chan bool
+
+	state uint32
+	done  chan bool
 }
 
 // New creates a new App and returns it
@@ -120,14 +128,16 @@ func (a *App) Serve() error {
 				log.String("stack", string(debug.Stack())),
 			)
 
-			// Attempt to clean resources before propagating the panic further up
-			if !a.drain {
-				a.Drain()
-			}
-
+			a.Close()
 			panic(recover)
 		}
 	}()
+
+	if !a.isState(down) {
+		a.ctx.Warning("lego.serve.state", "Server is not in down state",
+			log.Uint("state", uint(a.state)),
+		)
+	}
 
 	a.ctx.Trace("lego.serve", "Start serving...")
 
@@ -142,7 +152,8 @@ func (a *App) Serve() error {
 	// Notify all callees that the app is up and running
 	a.ready.Broadcast()
 
-	<-a.done // Hang on
+	atomic.StoreUint32(&a.state, up)
+	<-a.done
 	return nil
 }
 
@@ -153,25 +164,51 @@ func (a *App) Ready() {
 
 // Drain notify all handlers to enter in draining mode. It means they are no
 // longer accepting new requests, but they can finish all in-flight requests
-func (a *App) Drain() {
-	a.ctx.Trace("lego.drain", "Start draining...")
-
-	// Check if we are already stopping
+func (a *App) Drain() bool {
 	a.mu.Lock()
-	if a.drain {
+	if !a.isState(up) {
 		a.mu.Unlock()
-		return
+		return false
 	}
-	a.drain = true
+	atomic.StoreUint32(&a.state, drain)
 	a.mu.Unlock()
 
+	a.ctx.Trace("lego.drain", "Start draining...")
 	a.servers.Drain() // Block all new requests and drain in-flight requests
 	a.ctx.Drain()
+	return true
+}
 
+// Shutdown gracefully shuts down the server without interrupting any
+// active connections. Shutdown works by first draining all handlers, then
+// draining the main context, and finally shut down.
+// If the provided context expires before the shutdown is complete,
+// Shutdown returns the context's error, otherwise it returns any
+// error returned from closing the Server's underlying Listener(s).
+func (a *App) Shutdown() {
+	a.ctx.Trace("lego.shutdown", "Gracefully shutting down...")
+	if !a.Drain() {
+		a.ctx.Trace("lego.shutdown.abort", "Server already draining")
+		return
+	}
+	a.close()
+}
+
+// Close immediately closes the server and any in-flight request or background
+// job will be left unfinished.
+// For a graceful shutdown, use Shutdown.
+func (a *App) Close() error {
+	a.ctx.Trace("lego.close", "Closing immediately!")
+	a.close()
+	return nil
+}
+
+func (a *App) close() {
 	a.disco.Leave(a.ctx)
 	a.ctx.Cancel()
 
-	a.done <- true // Release Serve()
+	a.done <- true
+	atomic.StoreUint32(&a.state, down)
 }
 
 // Ctx returns the appliation context
@@ -219,31 +256,41 @@ func (a *App) Disco() disco.Agent {
 	return a.disco
 }
 
+// isState checks the current app state
+func (a *App) isState(state uint32) bool {
+	return atomic.LoadUint32(&a.state) == uint32(state)
+}
+
 func trapSignals(app *App) {
 	ch := make(chan os.Signal, 10)
 	signals := []os.Signal{
-		syscall.SIGHUP,
 		syscall.SIGINT,
-		syscall.SIGQUIT,
-		syscall.SIGABRT,
-		syscall.SIGKILL,
 		syscall.SIGTERM,
-		syscall.SIGUSR1,
-		syscall.SIGUSR2,
+		syscall.SIGQUIT,
+		syscall.SIGKILL,
 	}
 	signal.Notify(ch, signals...)
 
 	for {
 		sig := <-ch
-		app.Ctx().Trace("lego.signal", "Signal trapped", log.String("sig", sig.String()))
+		n, _ := sig.(syscall.Signal)
+		app.Ctx().Trace("lego.signal", "Signal trapped",
+			log.String("sig", sig.String()),
+			log.Int("n", int(n)),
+		)
 
 		switch sig {
 		case syscall.SIGINT, syscall.SIGTERM:
-			app.Drain() // start draining handlers
+			app.Shutdown()
+			signal.Stop(ch)
+			return
+		case syscall.SIGQUIT, syscall.SIGKILL:
+			app.Close()
 			signal.Stop(ch)
 			return
 		default:
-			signal.Stop(ch)
+			app.Ctx().Error("lego.signal.unhandled", "Unhandled signal")
+			os.Exit(128 + int(n))
 			return
 		}
 	}
