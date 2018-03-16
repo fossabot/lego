@@ -147,7 +147,7 @@ func (w *dnsWatcher) lookupSRV() map[string]*Update {
 	newAddrs := make(map[string]*Update)
 	_, srvs, err := lookupSRV(w.ctx, defaultSRV, "tcp", w.host)
 	if err != nil {
-		w.logger.Warning("naming.dns.fail", "Failed dns SRV record lookup",
+		w.logger.Trace("naming.dns.srv.fail", "Failed dns SRV record lookup",
 			log.Error(err),
 		)
 		return nil
@@ -156,7 +156,7 @@ func (w *dnsWatcher) lookupSRV() map[string]*Update {
 		lbAddrs, err := lookupHost(w.ctx, s.Target)
 		if err != nil {
 			w.logger.Warning(
-				"naming.dns.fail",
+				"naming.dns.srv.fail",
 				"Failed load balancer address dns lookup",
 				log.Error(err),
 			)
@@ -165,7 +165,7 @@ func (w *dnsWatcher) lookupSRV() map[string]*Update {
 		for _, a := range lbAddrs {
 			a, ok := formatIP(a)
 			if !ok {
-				w.logger.Warning("naming.dns.err", "Failed IP parsing",
+				w.logger.Warning("naming.dns.srv.err", "Failed IP parsing",
 					log.Error(err),
 				)
 				continue
@@ -181,7 +181,7 @@ func (w *dnsWatcher) lookupHost() map[string]*Update {
 	newAddrs := make(map[string]*Update)
 	addrs, err := lookupHost(w.ctx, w.host)
 	if err != nil {
-		w.logger.Warning("naming.dns.fail", "Failed dns A record lookup",
+		w.logger.Trace("naming.dns.a.fail", "Failed dns A record lookup",
 			log.Error(err),
 		)
 		return nil
@@ -189,7 +189,7 @@ func (w *dnsWatcher) lookupHost() map[string]*Update {
 	for _, a := range addrs {
 		a, ok := formatIP(a)
 		if !ok {
-			w.logger.Warning("naming.dns.err", "Failed IP parsing",
+			w.logger.Warning("naming.dns.a.err", "Failed IP parsing",
 				log.Error(err),
 			)
 			continue
