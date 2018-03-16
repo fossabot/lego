@@ -139,7 +139,7 @@ func (s *Server) Drain() {
 	s.http.Shutdown(context.Background()) // Then close all idle connections
 }
 
-// isDraining checks whether the handler is draining
+// isState checks the current server state
 func (s *Server) isState(state uint32) bool {
 	return atomic.LoadUint32(&s.state) == uint32(state)
 }
