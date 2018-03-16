@@ -6,6 +6,7 @@ package consul
 
 import (
 	"context"
+	"net"
 	"sort"
 	"strings"
 	"sync"
@@ -75,7 +76,19 @@ func (a *Agent) Register(ctx ctx.Ctx, r *disco.Registration) (string, error) {
 		Tags:    tags,
 	}
 	if a.advertAddr != "" {
-		reg.Address = a.advertAddr
+		if net.ParseIP(a.advertAddr) != nil {
+			reg.Address = a.advertAddr
+		} else {
+			addr, err := lookupHost(ctx, a.advertAddr)
+			if err != nil {
+				ctx.Warning(
+					"disco.register.invalid_ad_addr",
+					"Advertise addr is not an IP, nor a valid DNS A record",
+					log.String("advertise_address", a.advertAddr),
+				)
+			}
+			reg.Address = addr
+		}
 	}
 	err := a.consul.Agent().ServiceRegister(&reg)
 	if err != nil {
@@ -304,4 +317,33 @@ func isSubset(a, b []string) bool {
 		}
 	}
 	return false
+}
+
+func lookupHost(ctx context.Context, host string) (string, error) {
+	addrs, err := net.DefaultResolver.LookupHost(ctx, host)
+	if err != nil {
+		return "", err
+	}
+	for _, a := range addrs {
+		a, ok := formatIP(a)
+		if !ok {
+			continue
+		}
+		return a, nil
+	}
+	return "", errors.New("error parsing all addresses")
+}
+
+// formatIP returns ok = false if addr is not a valid textual representation of an IP address.
+// If addr is an IPv4 address, return the addr and ok = true.
+// If addr is an IPv6 address, return the addr enclosed in square brackets and ok = true.
+func formatIP(addr string) (addrIP string, ok bool) {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return "", false
+	}
+	if ip.To4() != nil {
+		return addr, true
+	}
+	return "[" + addr + "]", true
 }
