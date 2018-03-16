@@ -60,14 +60,6 @@ type Agent struct {
 
 func (a *Agent) Register(ctx ctx.Ctx, r *disco.Registration) (string, error) {
 	tags := append(a.appConfig.Disco.DefaultTags, r.Tags...)
-
-	ctx.Trace("disco.register", "Register service",
-		log.String("name", r.Name),
-		log.Uint("port", uint(r.Port)),
-		log.String("adapter", "consul"),
-		log.String("tags", strings.Join(tags, ", ")),
-	)
-
 	reg := api.AgentServiceRegistration{
 		ID:      uuid.New().String(),
 		Name:    r.Name,
@@ -90,6 +82,14 @@ func (a *Agent) Register(ctx ctx.Ctx, r *disco.Registration) (string, error) {
 			reg.Address = addr
 		}
 	}
+
+	ctx.Trace("disco.register", "Register service",
+		log.String("adapter", "consul"),
+		log.String("name", reg.Name),
+		log.String("address", reg.Address),
+		log.Int("port", reg.Port),
+		log.String("tags", strings.Join(reg.Tags, ", ")),
+	)
 	err := a.consul.Agent().ServiceRegister(&reg)
 	if err != nil {
 		return "", err
