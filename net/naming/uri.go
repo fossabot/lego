@@ -1,6 +1,8 @@
 package naming
 
-import "github.com/stairlin/lego/ctx/app"
+import (
+	"github.com/stairlin/lego/ctx/app"
+)
 
 // URI returns a resolver that uses the target URI scheme to select a real resolver
 func URI(ctx app.Ctx) Resolver {

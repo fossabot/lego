@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -41,16 +42,18 @@ func DNS(ctx app.Ctx, freq ...time.Duration) Resolver {
 }
 
 func buildDNS(ctx app.Ctx, uri *url.URL) (Watcher, error) {
+	target := strings.TrimPrefix(uri.Path, "/")
+
 	fp := uri.Query().Get("freq")
 	if fp == "" {
-		return DNS(ctx).Resolve(uri.Host)
+		return DNS(ctx).Resolve(target)
 	}
 
 	f, err := strconv.ParseInt(fp, 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing DNS update frequency")
 	}
-	return DNS(ctx, time.Second*time.Duration(f)).Resolve(uri.Host)
+	return DNS(ctx, time.Second*time.Duration(f)).Resolve(target)
 }
 
 // dnsResolver handles name resolution for names following the DNS scheme
