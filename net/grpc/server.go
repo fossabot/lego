@@ -14,20 +14,10 @@ import (
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/log"
+	lnet "github.com/stairlin/lego/net"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
-)
-
-const (
-	// down mode is the default state. The handler is not ready to accept
-	// new connections
-	down uint32 = 0
-	// up mode is when a handler accepts connections
-	up uint32 = 1
-	// drain mode is when a handler stops accepting new connection, but wait
-	// for all existing in-flight requests to complete
-	drain uint32 = 2
 )
 
 // A Server defines parameters for running a lego compatible GRPC server
@@ -134,7 +124,7 @@ func (s *Server) ActivateMutualTLS(certFile, keyFile, caFile string) {
 // Serve starts serving HTTP requests (blocking call)
 func (s *Server) Serve(addr string, ctx app.Ctx) error {
 	s.app = ctx
-	defer atomic.StoreUint32(&s.mode, down)
+	defer atomic.StoreUint32(&s.mode, lnet.StateDown)
 
 	// Register interceptor
 	s.opts = append(s.opts, grpc.UnaryInterceptor(s.unaryInterceptor))
@@ -167,7 +157,7 @@ func (s *Server) Serve(addr string, ctx app.Ctx) error {
 		log.String("addr", addr),
 		log.Bool("tls", tlsEnabled),
 	)
-	atomic.StoreUint32(&s.mode, up)
+	atomic.StoreUint32(&s.mode, lnet.StateUp)
 	err = s.GRPC.Serve(lis)
 	switch err := err.(type) {
 	case *net.OpError:
@@ -180,13 +170,13 @@ func (s *Server) Serve(addr string, ctx app.Ctx) error {
 
 // Drain puts the handler into drain mode.
 func (s *Server) Drain() {
-	atomic.StoreUint32(&s.mode, drain)
+	atomic.StoreUint32(&s.mode, lnet.StateDrain)
 	s.GRPC.GracefulStop()
 }
 
 // isDraining checks whether the handler is draining
 func (s *Server) isDraining() bool {
-	return atomic.LoadUint32(&s.mode) == drain
+	return atomic.LoadUint32(&s.mode) == lnet.StateDrain
 }
 
 func (s *Server) unaryInterceptor(
