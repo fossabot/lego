@@ -10,13 +10,14 @@ import (
 	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/example/grpc/server/demo"
 	lgrpc "github.com/stairlin/lego/net/grpc"
+	"github.com/stairlin/lego/net/naming"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	err := start()
 	if err != nil {
-		fmt.Println("App error", err)
+		fmt.Println("App error:", err)
 		os.Exit(1)
 	}
 }
@@ -36,9 +37,13 @@ func start() error {
 	// Setup gRPC client
 	c, err := lgrpc.NewClient(
 		app.Ctx(),
-		"passthrough://127.0.0.1:"+os.Getenv("GRPC_PORT"),
+		"disco://grpc.demo",
 		grpc.WithInsecure(),
-		grpc.WithTimeout(time.Second*60),
+		grpc.WithTimeout(time.Second*10),
+		grpc.WithBlock(),
+		grpc.WithBalancer(grpc.RoundRobin(
+			lgrpc.WrapResolver(naming.URI(app.Ctx())),
+		)),
 	)
 	if err != nil {
 		return errors.Wrap(err, "error connecting to server")
@@ -48,19 +53,20 @@ func start() error {
 	// Setup demo service
 	demoSvc := demo.NewDemoClient(c.GRPC)
 
-	// Prepare context
-	ctx := journey.New(app.Ctx())
-	ctx.Trace("prepare", "Prepare context")
-	ctx.Store("lang", "en_GB")
-	ctx.Store("ip", "10.0.0.21")
-	ctx.Store("flag", 3)
-
 	// Call service
-	res, err := demoSvc.Hello(ctx, &demo.Request{Msg: "Ping"})
-	if err != nil {
-		return errors.Wrap(err, "grpc call failed")
-	}
+	for i := 0; i < 3; i++ {
+		// Prepare context
+		ctx := journey.New(app.Ctx())
+		ctx.Trace("prepare", "Prepare context")
+		ctx.Store("lang", "en_GB")
+		ctx.Store("ip", "10.0.0.21")
+		ctx.Store("flag", 3)
 
-	fmt.Println("Hello service returned", res.Msg)
+		res, err := demoSvc.Hello(ctx, &demo.Request{Msg: "Ping"})
+		if err != nil {
+			return errors.Wrap(err, "grpc call failed")
+		}
+		fmt.Println("Hello service returned", res.Msg)
+	}
 	return nil
 }

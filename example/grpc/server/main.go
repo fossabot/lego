@@ -11,8 +11,9 @@ import (
 	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/example/grpc/server/demo"
 	"github.com/stairlin/lego/log"
-	"github.com/stairlin/lego/net/grpc"
+	lgrpc "github.com/stairlin/lego/net/grpc"
 	context "golang.org/x/net/context"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -40,8 +41,14 @@ func start() error {
 	if err != nil {
 		return errors.Wrap(err, "Problem parsing port")
 	}
-	s := grpc.NewServer()
+	s := lgrpc.NewServer()
 	s.AppendUnaryMiddleware(traceMiddleware)
+	s.Handle(func(s *grpc.Server) {
+		demo.RegisterDemoServer(s, &gRPCServer{
+			node:   os.Getenv("NODE_NAME"),
+			appCtx: app.Ctx(),
+		})
+	})
 
 	// Register gRPC handler as a service
 	err = app.RegisterService(&lego.ServiceRegistration{
@@ -53,12 +60,6 @@ func start() error {
 	if err != nil {
 		return errors.Wrap(err, "Problem registering service")
 	}
-
-	// Register gRPC service
-	demo.RegisterDemoServer(s.GRPC, &gRPCServer{
-		node:   os.Getenv("NODE_NAME"),
-		appCtx: app.Ctx(),
-	})
 
 	// Start serving requests
 	err = app.Serve()
@@ -85,7 +86,7 @@ func (s *gRPCServer) Hello(
 	return &demo.Response{Msg: s.node}, nil
 }
 
-func traceMiddleware(next grpc.UnaryHandler) grpc.UnaryHandler {
+func traceMiddleware(next lgrpc.UnaryHandler) lgrpc.UnaryHandler {
 	return func(ctx journey.Ctx, req interface{}) (interface{}, error) {
 		ctx.Trace("grpc.trace.start", "Start call")
 		res, err := next(ctx, req)

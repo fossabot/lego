@@ -11,4 +11,4 @@ start2:
 
 call:
 		cd client && \
-		GRPC_PORT=8000 CONFIG_URI=file://${PWD}/client/config.json go run main.go
+		CONFIG_URI=file://${PWD}/client/config.json go run main.go
