@@ -239,7 +239,7 @@ func (a *App) RegisterService(r *ServiceRegistration) error {
 		Name: r.Name,
 		Addr: r.Host,
 		Port: r.Port,
-		Tags: append(r.Tags, a.service, a.config.Version),
+		Tags: append(r.Tags, a.service),
 	}
 	if _, err := a.disco.Register(a.Ctx(), &dr); err != nil {
 		return errors.Wrap(err, "error registering service")
