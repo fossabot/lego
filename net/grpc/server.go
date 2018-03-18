@@ -50,7 +50,6 @@ type Server struct {
 // NewServer creates a new GRPC server
 func NewServer() *Server {
 	return &Server{
-		GRPC: grpc.NewServer(),
 		unaryMiddlewares: []UnaryServerMiddleware{
 			mwServerLogging,
 			mwServerStats,
