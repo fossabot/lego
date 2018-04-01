@@ -116,6 +116,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Drain implements net.Server
 func (s *Server) Drain() {
+	atomic.StoreUint32(&s.state, net.StateDrain)
 	s.HTTP.Shutdown(context.Background()) // Close all idle connections
 	if s.watcher != nil {
 		s.watcher.Close()
