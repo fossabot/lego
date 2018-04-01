@@ -187,6 +187,7 @@ func (a *App) Drain() bool {
 // error returned from closing the Server's underlying Listener(s).
 func (a *App) Shutdown() {
 	a.ctx.Trace("lego.shutdown", "Gracefully shutting down...")
+	a.disco.Leave(a.ctx)
 	if !a.Drain() {
 		a.ctx.Trace("lego.shutdown.abort", "Server already draining")
 		return
@@ -199,12 +200,12 @@ func (a *App) Shutdown() {
 // For a graceful shutdown, use Shutdown.
 func (a *App) Close() error {
 	a.ctx.Trace("lego.close", "Closing immediately!")
+	a.disco.Leave(a.ctx)
 	a.close()
 	return nil
 }
 
 func (a *App) close() {
-	a.disco.Leave(a.ctx)
 	a.ctx.Cancel()
 
 	a.done <- true
