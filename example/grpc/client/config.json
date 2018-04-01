@@ -6,7 +6,7 @@
     "adapter": "consul",
     "advertise_address": "127.0.0.1",
     "config": {
-      "address": "localhost:32824"
+      "address": "localhost:8500"
     }
   },
   "log": {
