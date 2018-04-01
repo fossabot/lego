@@ -223,12 +223,14 @@ func (a *Agent) service(
 			continue
 		}
 
+		_, local := a.serviceIDs[chk.Service.ID]
 		instances = append(instances, &disco.Instance{
-			ID:   chk.Service.ID,
-			Name: chk.Service.Service,
-			Host: chk.Service.Address,
-			Port: uint16(chk.Service.Port),
-			Tags: chk.Service.Tags,
+			Local: local,
+			ID:    chk.Service.ID,
+			Name:  chk.Service.Service,
+			Host:  chk.Service.Address,
+			Port:  uint16(chk.Service.Port),
+			Tags:  chk.Service.Tags,
 		})
 	}
 	return instances, meta, nil

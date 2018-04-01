@@ -36,11 +36,12 @@ func (a *localAgent) Register(ctx ctx.Ctx, r *disco.Registration) (string, error
 		return "", errors.New("service already registered")
 	}
 	instance := &disco.Instance{
-		ID:   id,
-		Name: r.Name,
-		Host: r.Addr,
-		Port: r.Port,
-		Tags: r.Tags,
+		Local: true,
+		ID:    id,
+		Name:  r.Name,
+		Host:  r.Addr,
+		Port:  r.Port,
+		Tags:  r.Tags,
 	}
 	a.Registry[id] = instance
 

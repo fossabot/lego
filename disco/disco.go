@@ -40,7 +40,11 @@ type Service interface {
 
 // An Instance is an instance of a remotely-accessible service on the network
 type Instance struct {
-	ID   string
+	// Local tells whether it is a local or remote instance
+	Local bool
+	// ID is the unique instance identifier
+	ID string
+	// Name is a friendly name
 	Name string
 	Host string
 	Port uint16
