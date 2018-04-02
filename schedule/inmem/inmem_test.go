@@ -1,6 +1,7 @@
 package inmem_test
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -90,10 +91,10 @@ func TestInMem_DequeueValidJobs(t *testing.T) {
 	}
 
 	expect := []byte("data dawg")
-	var callbackCount int
+	var callbackCount uint32
 
 	dereg, err := scheduler.Register("foo", func(id string, data []byte) error {
-		callbackCount++
+		atomic.AddUint32(&callbackCount, 1)
 		if id == "" {
 			t.Error("expect id to not be empty")
 		}
@@ -134,8 +135,8 @@ func TestInMem_DequeueValidJobs(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 90)
 
-	expectCalls := 3
-	if callbackCount != expectCalls {
+	var expectCalls uint32 = 3
+	if atomic.LoadUint32(&callbackCount) != expectCalls {
 		t.Errorf("expect fn to be called back %d times, but got %d",
 			expectCalls, callbackCount,
 		)

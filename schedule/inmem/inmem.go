@@ -73,7 +73,9 @@ func (s *scheduler) Register(
 
 	s.registrations[target] = fn
 	dereg := func() {
+		s.mu.Lock()
 		delete(s.registrations, target)
+		s.mu.Unlock()
 	}
 	return dereg, nil
 }
@@ -172,13 +174,14 @@ func (q *jobQueue) Swap(i, j int) {
 }
 
 func (q *jobQueue) Push(x interface{}) {
+	q.mu.Lock()
 	event := x.(*event)
 	event.Index = len(q.L)
 
-	q.mu.Lock()
 	q.L = append(q.L, event)
 	q.mu.Unlock()
 
+	// Fix calls other jobQueue functions, so it cannot be locked
 	heap.Fix(q, event.Index)
 }
 
