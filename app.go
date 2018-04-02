@@ -32,11 +32,12 @@ type App struct {
 	mu    sync.Mutex
 	ready *sync.Cond
 
-	service string
-	ctx     app.Ctx
-	config  *config.Config
-	disco   disco.Agent
-	servers *net.Reg
+	service       string
+	ctx           app.Ctx
+	config        *config.Config
+	disco         disco.Agent
+	servers       *net.Reg
+	registrations []*disco.Registration
 
 	state uint32
 	done  chan bool
@@ -149,6 +150,13 @@ func (a *App) Serve() error {
 		return err
 	}
 
+	for _, reg := range a.registrations {
+		_, err := a.disco.Register(a.Ctx(), reg)
+		if err != nil {
+			return errors.Wrapf(err, "error registering service <%s>", reg.Name)
+		}
+	}
+
 	// Notify all callees that the app is up and running
 	a.ready.Broadcast()
 
@@ -224,28 +232,33 @@ func (a *App) RegisterServer(addr string, s net.Server) {
 
 // ServiceRegistration contains info to register a service
 type ServiceRegistration struct {
-	Name   string
-	Host   string
-	Port   uint16
+	// ID is the service instance unique identifier (optional)
+	ID string
+	// Name is the service identifier
+	Name string
+	// Host is the interface on which the server runs.
+	// Service discovery can override this value.
+	Host string
+	// Port is the port number
+	Port uint16
+	// Server is the server that provides the registered service
 	Server net.Server
-	Tags   []string
+	// Tags for that service (versioning, blue-green, whatever)
+	Tags []string
 }
 
 // RegisterService adds the server to the list of managed servers and registers
 // it to service discovery
-func (a *App) RegisterService(r *ServiceRegistration) error {
+func (a *App) RegisterService(r *ServiceRegistration) {
 	a.servers.Add(net.JoinHostPort(r.Host, strconv.Itoa(int(r.Port))), r.Server)
 
-	dr := disco.Registration{
+	a.registrations = append(a.registrations, &disco.Registration{
+		ID:   r.ID,
 		Name: r.Name,
 		Addr: r.Host,
 		Port: r.Port,
 		Tags: append(r.Tags, a.service),
-	}
-	if _, err := a.disco.Register(a.Ctx(), &dr); err != nil {
-		return errors.Wrap(err, "error registering service")
-	}
-	return nil
+	})
 }
 
 // Disco returns the active service discovery agent.
