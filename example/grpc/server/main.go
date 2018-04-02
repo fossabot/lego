@@ -51,15 +51,12 @@ func start() error {
 	})
 
 	// Register gRPC handler as a service
-	err = app.RegisterService(&lego.ServiceRegistration{
+	app.RegisterService(&lego.ServiceRegistration{
 		Name:   "grpc.demo",
 		Host:   "127.0.0.1",
 		Port:   uint16(port),
 		Server: s,
 	})
-	if err != nil {
-		return errors.Wrap(err, "Problem registering service")
-	}
 
 	// Start serving requests
 	err = app.Serve()

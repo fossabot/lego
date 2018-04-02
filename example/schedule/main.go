@@ -42,16 +42,15 @@ func start(app *lego.App) error {
 	server := schedule.NewServer()
 
 	// Register it as a service
-	err = app.RegisterService(&lego.ServiceRegistration{
+	id := fmt.Sprintf("schedule.%s", app.Config().Node)
+	app.RegisterService(&lego.ServiceRegistration{
+		ID:     id, // For now
 		Name:   "schedule.local",
 		Host:   "127.0.0.1",
 		Port:   uint16(port),
 		Server: server,
 		Tags:   tags,
 	})
-	if err != nil {
-		return errors.Wrap(err, "error registering service")
-	}
 
 	svc, err := app.Disco().Service(app.Ctx(), "schedule.local", "v1")
 	if err != nil {
