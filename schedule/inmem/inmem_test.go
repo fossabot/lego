@@ -133,7 +133,7 @@ func TestInMem_DequeueValidJobs(t *testing.T) {
 		t.Fatal("cannot schedule job")
 	}
 
-	time.Sleep(time.Millisecond * 90)
+	time.Sleep(time.Millisecond * 150)
 
 	var expectCalls uint32 = 3
 	if atomic.LoadUint32(&callbackCount) != expectCalls {
