@@ -1,4 +1,5 @@
-package schedule
+// Package inmem implements an in-memory scheduler for testing purpose only
+package inmem
 
 import (
 	"container/heap"
@@ -6,21 +7,11 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/stairlin/lego/schedule"
 )
 
-// NewInMem creates a new in-memory scheduler. It should only be used for testing
-// purpose. JOBS ARE NOT PERSISTED.
-func NewInMem() Scheduler {
-	s := &inMemScheduler{
-		registrations: make(map[string]func(string, []byte) error),
-		stop:          make(chan struct{}),
-		update:        make(chan struct{}, 1),
-	}
-	heap.Init(&s.q)
-	return s
-}
-
-type inMemScheduler struct {
+type scheduler struct {
 	mu sync.RWMutex
 
 	q             jobQueue
@@ -29,38 +20,48 @@ type inMemScheduler struct {
 	update        chan struct{}
 }
 
-func (s *inMemScheduler) Start(config SchedulerConfig) error {
+// NewScheduler creates a new in-memory scheduler.
+// It should only be used for testing purpose. JOBS ARE NOT PERSISTED.
+func NewScheduler() schedule.Scheduler {
+	s := &scheduler{
+		registrations: make(map[string]func(string, []byte) error),
+		stop:          make(chan struct{}),
+		update:        make(chan struct{}, 1),
+	}
+	heap.Init(&s.q)
+	return s
+}
+
+func (s *scheduler) Start() error {
 	go s.dequeueEvents()
 	return nil
 }
 
-func (s *inMemScheduler) At(
-	t time.Time, target string, data []byte, o ...JobOption,
+func (s *scheduler) At(
+	t time.Time, target string, data []byte, o ...schedule.JobOption,
 ) (string, error) {
-	j := BuildJob()
-	j.Due = t
+	j := schedule.BuildJob(o...)
+	j.Due = t.UnixNano()
 	j.Target = target
 	j.Data = data
-	for _, o := range o {
-		o(&j.Options)
-	}
 
 	s.q.Push(&event{
-		Job: j,
-		Due: j.Due.UnixNano(),
+		Job:     j,
+		Attempt: 1,
+		Due:     j.Due,
 	})
 	s.update <- struct{}{}
 
 	return j.ID, nil
 }
 
-func (s *inMemScheduler) In(
-	d time.Duration, target string, data []byte, o ...JobOption,
+func (s *scheduler) In(
+	d time.Duration, target string, data []byte, o ...schedule.JobOption,
 ) (string, error) {
 	return s.At(time.Now().Add(d), target, data, o...)
 }
 
-func (s *inMemScheduler) Register(
+func (s *scheduler) Register(
 	target string, fn func(string, []byte) error,
 ) (deregister func(), err error) {
 	s.mu.Lock()
@@ -77,12 +78,12 @@ func (s *inMemScheduler) Register(
 	return dereg, nil
 }
 
-func (s *inMemScheduler) Close() error {
+func (s *scheduler) Close() error {
 	s.stop <- struct{}{}
 	return nil
 }
 
-func (s *inMemScheduler) execute(i *event) {
+func (s *scheduler) execute(i *event) {
 	s.mu.RLock()
 	fn, ok := s.registrations[i.Job.Target]
 	s.mu.RUnlock()
@@ -92,30 +93,31 @@ func (s *inMemScheduler) execute(i *event) {
 	}
 
 	j := i.Job
-	j.Attempt++
 	if err := fn(j.ID, j.Data); err == nil {
 		return
 	}
 
-	if j.Attempt >= j.Options.RetryLimit ||
-		(j.Options.AgeLimit != nil && time.Now().Sub(j.Due) > *j.Options.AgeLimit) {
+	lost := i.Attempt >= j.Options.RetryLimit
+	stale := j.Options.AgeLimit != nil && time.Now().UnixNano()-j.Due > int64(*j.Options.AgeLimit)
+	if lost || stale {
 		return
 	}
 
 	// Push back to queue
-	backoff := time.Second * time.Duration(math.Pow(2, float64(j.Attempt)))
+	backoff := time.Second * time.Duration(math.Pow(2, float64(i.Attempt)))
 	if backoff < j.Options.MinBackOff {
 		backoff = j.Options.MinBackOff
-	} else if backoff > j.Options.MaxBackoff {
-		backoff = j.Options.MaxBackoff
+	} else if backoff > j.Options.MaxBackOff {
+		backoff = j.Options.MaxBackOff
 	}
 	s.q.Push(&event{
-		Job: j,
-		Due: j.Due.UnixNano() + int64(backoff),
+		Job:     j,
+		Attempt: i.Attempt + 1,
+		Due:     j.Due + int64(backoff),
 	})
 }
 
-func (s *inMemScheduler) dequeueEvents() {
+func (s *scheduler) dequeueEvents() {
 	for {
 		if s.q.Len() == 0 {
 			select {
@@ -126,7 +128,7 @@ func (s *inMemScheduler) dequeueEvents() {
 			}
 		}
 
-		d := s.q.next().Due.Sub(time.Now())
+		d := s.q.next().Due - time.Now().UnixNano()
 		if d <= 0 {
 			// there is a slim chance to have a race condition, but both jobs would
 			// have to be executed anyway
@@ -135,7 +137,7 @@ func (s *inMemScheduler) dequeueEvents() {
 		}
 
 		select {
-		case <-time.Tick(d):
+		case <-time.Tick(time.Duration(d)):
 		case <-s.update:
 		case <-s.stop:
 			return
@@ -191,7 +193,7 @@ func (q *jobQueue) Pop() interface{} {
 	return event
 }
 
-func (q *jobQueue) next() *Job {
+func (q *jobQueue) next() *schedule.Job {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
@@ -199,7 +201,8 @@ func (q *jobQueue) next() *Job {
 }
 
 type event struct {
-	Job   *Job
-	Due   int64 // priority in the queue (unix ns since epoch)
-	Index int   // The Index of the event in the heap
+	Job     *schedule.Job
+	Attempt uint32
+	Due     int64 // priority in the queue (unix ns since epoch)
+	Index   int   // The Index of the event in the heap
 }

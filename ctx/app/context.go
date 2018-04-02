@@ -16,6 +16,7 @@ import (
 	"github.com/stairlin/lego/disco"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/schedule"
+	"github.com/stairlin/lego/schedule/inmem"
 	"github.com/stairlin/lego/stats"
 )
 
@@ -76,7 +77,7 @@ func NewCtx(
 		bgReg:      reg,
 		disco:      sd,
 		cache:      cache.New(),
-		scheduler:  schedule.NewInMem(),
+		scheduler:  inmem.NewScheduler(),
 		c:          ctx,
 		cancelFunc: cancelFunc,
 		l:          l.AddCalldepth(1),

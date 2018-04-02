@@ -92,6 +92,7 @@ func (r *Reg) Serve() error {
 				log.Type("server", s),
 			)
 			wg.Done()
+			// TODO: Send pre-flight requests to make sure the server is ready
 			err := s.Serve(addr, r.ctx)
 			if err != nil {
 				r.ctx.Error("lego.serve.s", "Server error",

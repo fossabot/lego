@@ -10,19 +10,19 @@ const (
 	// DefaultRetryLimit is the default limit for retrying a failed job, measured
 	// from when the job was first run.
 	DefaultRetryLimit = 5
-	// DefaultMinBackoff is the default minimum duration to wait before retrying
+	// DefaultMinBackOff is the default minimum duration to wait before retrying
 	// a job after it fails.
-	DefaultMinBackoff = time.Second
-	// DefaultMaxBackoff is the default maximum duration to wait before retrying
+	DefaultMinBackOff = time.Second
+	// DefaultMaxBackOff is the default maximum duration to wait before retrying
 	// a job after it fails.
-	DefaultMaxBackoff = time.Hour
+	DefaultMaxBackOff = time.Hour
 )
 
 // Scheduler is a time-based job scheduler. It executes jobs at fixed times or intervals
 type Scheduler interface {
 	// Start does the initialisation work to bootstrap a Scheduler. For example,
 	// this function may start the event loop and watch the updates.
-	Start(config SchedulerConfig) error
+	Start() error
 
 	// At registers a job that will be executed at time t
 	At(t time.Time, target string, data []byte, o ...JobOption) (string, error)
@@ -45,43 +45,51 @@ type Scheduler interface {
 	Close() error
 }
 
-type SchedulerConfig struct{}
-
 // A Job is a one-time task executed at a specific time.
 type Job struct {
-	ID      string
-	Target  string
-	Due     time.Time
-	Data    []byte
-	Attempt uint32
-
-	Options jobOptions
+	// ID is a globally unique identifier
+	ID string
+	// Target contains the subscriber that needs to be called back when the job
+	// is being executed
+	Target string
+	// Due defines when the job is bound to be executed.
+	// It is defined in unix ns since epoch
+	Due int64
+	// Data is the job payload (optional)
+	Data []byte
+	// Options contains information about the job execution, such as its retry limit,
+	// back off duration upon failure, consistency guarantee, ...
+	Options JobOptions
 }
 
-func BuildJob() *Job {
-	return &Job{
+// BuildJob builds a new job with its default values and options applied
+func BuildJob(o ...JobOption) *Job {
+	j := &Job{
 		ID: uuid.New().String(),
-		Options: jobOptions{
-			RetryLimit: DefaultRetryLimit,
-			MinBackOff: DefaultMinBackoff,
-			MaxBackoff: DefaultMaxBackoff,
-			Storage:    defaultStorageConfig,
+		Options: JobOptions{
+			RetryLimit:  DefaultRetryLimit,
+			MinBackOff:  DefaultMinBackOff,
+			MaxBackOff:  DefaultMaxBackOff,
+			Consistency: AtLeastOnce,
 		},
 	}
+	for _, o := range o {
+		o(&j.Options)
+	}
+	return j
 }
 
 // JobOption configures how we set up a job
-type JobOption func(*jobOptions)
+type JobOption func(*JobOptions)
 
-// jobOptions configure a Job. jobOptions are set by the JobOption values passed
+// JobOptions configure a Job. JobOptions are set by the JobOption values passed
 // to At, In, or Interval.
-type jobOptions struct {
-	RetryLimit uint32
-	MinBackOff time.Duration
-	MaxBackoff time.Duration
-	AgeLimit   *time.Duration
-
-	Storage StorageConfig
+type JobOptions struct {
+	RetryLimit  uint32
+	MinBackOff  time.Duration
+	MaxBackOff  time.Duration
+	AgeLimit    *time.Duration
+	Consistency Consistency
 }
 
 // WithConsistency sets the job consistency guarantee when it uses a distributed scheduler
@@ -89,8 +97,8 @@ type jobOptions struct {
 // It can either be executed at most once or at least once. The consistency guarantee
 // strongly depends on the situation.
 func WithConsistency(c Consistency) JobOption {
-	return func(o *jobOptions) {
-		o.Storage.Consistency = c
+	return func(o *JobOptions) {
+		o.Consistency = c
 	}
 }
 
@@ -98,22 +106,22 @@ func WithConsistency(c Consistency) JobOption {
 //
 // When omitted from the parameters, the limit is set to 'DefaultRetryLimit' by default.
 func WithRetryLimit(l uint32) JobOption {
-	return func(o *jobOptions) {
+	return func(o *JobOptions) {
 		o.RetryLimit = l
 	}
 }
 
 // MinBackOff sets the minimum duration to wait before retrying a job after it fails.
 func MinBackOff(d time.Duration) JobOption {
-	return func(o *jobOptions) {
+	return func(o *JobOptions) {
 		o.MinBackOff = d
 	}
 }
 
-// MaxBackoff sets the maximum duration to wait before retrying a job after it fails.
-func MaxBackoff(d time.Duration) JobOption {
-	return func(o *jobOptions) {
-		o.MaxBackoff = d
+// MaxBackOff sets the maximum duration to wait before retrying a job after it fails.
+func MaxBackOff(d time.Duration) JobOption {
+	return func(o *JobOptions) {
+		o.MaxBackOff = d
 	}
 }
 
@@ -121,7 +129,21 @@ func MaxBackoff(d time.Duration) JobOption {
 // the job was first run. If specified with WithRetryLimit, the scheduler retries
 // the job until both limits are reached.
 func WithAgeLimit(d time.Duration) JobOption {
-	return func(o *jobOptions) {
+	return func(o *JobOptions) {
 		o.AgeLimit = &d
 	}
 }
+
+// Consistency is a job consistency guarantee on a distributed system
+type Consistency uint8
+
+const (
+	// AtMostOnce is a consistency guarantee when a job is on a distributed scheduler
+	// that ensures the job will be executed at most once.
+	// That means it will be either executed once or not executed at all.
+	AtMostOnce Consistency = iota
+	// AtLeastOnce is a consistency guarantee when a job is on a distributed scheduler
+	// that ensures the job will be executed at least once.
+	// That means it will be either executed once or executed multiple times.
+	AtLeastOnce
+)

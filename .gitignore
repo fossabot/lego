@@ -32,3 +32,6 @@ _testmain.go
 /bin
 /vendor
 .DS_Store
+
+# Test files
+*.db

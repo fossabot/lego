@@ -1,15 +1,15 @@
-package schedule_test
+package inmem_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/stairlin/lego/schedule"
+	"github.com/stairlin/lego/schedule/inmem"
 )
 
 func TestInMem_Init(t *testing.T) {
-	scheduler := schedule.NewInMem()
-	if err := scheduler.Start(schedule.SchedulerConfig{}); err != nil {
+	scheduler := inmem.NewScheduler()
+	if err := scheduler.Start(); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 
@@ -19,8 +19,8 @@ func TestInMem_Init(t *testing.T) {
 }
 
 func TestInMem_ScheduleJob(t *testing.T) {
-	scheduler := schedule.NewInMem()
-	if err := scheduler.Start(schedule.SchedulerConfig{}); err != nil {
+	scheduler := inmem.NewScheduler()
+	if err := scheduler.Start(); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 
@@ -42,8 +42,8 @@ func TestInMem_ScheduleJob(t *testing.T) {
 }
 
 func TestInMem_Register(t *testing.T) {
-	scheduler := schedule.NewInMem()
-	if err := scheduler.Start(schedule.SchedulerConfig{}); err != nil {
+	scheduler := inmem.NewScheduler()
+	if err := scheduler.Start(); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 
@@ -84,8 +84,8 @@ func TestInMem_Register(t *testing.T) {
 // TestInMem_DequeueValidJobs ensures that only scheduled now or in the past
 // are being executed
 func TestInMem_DequeueValidJobs(t *testing.T) {
-	scheduler := schedule.NewInMem()
-	if err := scheduler.Start(schedule.SchedulerConfig{}); err != nil {
+	scheduler := inmem.NewScheduler()
+	if err := scheduler.Start(); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 
@@ -144,8 +144,8 @@ func TestInMem_DequeueValidJobs(t *testing.T) {
 
 // TestInMem_LeaveFutureJobs ensures that future jobs are not executed
 func TestInMem_LeaveFutureJobs(t *testing.T) {
-	scheduler := schedule.NewInMem()
-	if err := scheduler.Start(schedule.SchedulerConfig{}); err != nil {
+	scheduler := inmem.NewScheduler()
+	if err := scheduler.Start(); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 

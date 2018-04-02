@@ -1,0 +1,31 @@
+syntax = "proto3";
+package local;
+
+message Index {
+  int64 min = 1;
+  int64 max = 2;
+  repeated string keys = 3;
+}
+
+message Job {
+	string id = 1;
+  string target = 2;
+  int64 due = 3;
+  bytes data = 4;
+  uint32 attempt = 5;
+
+  JobOptions options = 15;
+}
+
+message JobOptions {
+  uint32 retryLimit = 1;
+  int64 minBackOff = 2;
+  int64 maxBackOff = 3;
+  int64 ageLimit = 4;
+  Consistency consistency = 5;
+}
+
+enum Consistency {
+  AtMostOnce = 0;
+  AtLeastOnce = 1;
+}

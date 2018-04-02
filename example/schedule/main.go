@@ -56,7 +56,10 @@ func start(app *lego.App) error {
 	if err != nil {
 		return errors.Wrap(err, "error getting service")
 	}
-	server.AddOptions(schedule.OptDisco(svc))
+	server.AddOptions(
+		schedule.OptID(id),
+		schedule.OptDisco(svc),
+	)
 
 	// Start serving requests
 	err = app.Serve()

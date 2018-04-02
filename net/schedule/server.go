@@ -11,11 +11,11 @@ import (
 
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
+	"github.com/pkg/errors"
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/disco"
 	"github.com/stairlin/lego/log"
 	lnet "github.com/stairlin/lego/net"
-	"github.com/stairlin/toolkit.go/errors"
 )
 
 const (
@@ -53,6 +53,9 @@ type Server struct {
 	transportLogger *logger
 	peers           peerMap
 
+	// Scheduler
+	scheduler *scheduler
+
 	// # Service discovery
 
 	// service is a link to service discovery that allows to run this server
@@ -80,7 +83,7 @@ func NewServer(opts ...Option) *Server {
 		config: serverConfig{
 			raft:              *raft.DefaultConfig(),
 			baseDir:           "schedule",
-			leaveGracefulTime: 10 * time.Second,
+			leaveGracefulTime: 5 * time.Second,
 		},
 		done: make(chan struct{}),
 	}
@@ -94,23 +97,11 @@ func (s *Server) Serve(addr string, ctx app.Ctx) error {
 	defer atomic.StoreUint32(&s.state, lnet.StateDown)
 	s.ctx = ctx
 
-	// Setup cluster from service discovery
-	if s.service != nil {
-		instances := s.service.Instances()
-		if len(instances) == 0 {
-			return errors.New("service must contain at least one instance")
-		}
-
-		for _, inst := range instances {
-			if inst.Local {
-				s.config.raft.LocalID = raft.ServerID(inst.ID)
-				s.config.dir = filepath.Join(s.config.baseDir, inst.ID)
-			}
-		}
-	} else {
-		s.ctx.Trace("s.schedule.single_clust", "Initialise single node cluster")
-		s.config.raft.LocalID = raft.ServerID("foo")
+	if s.id == "" {
+		s.id = "local"
 	}
+	s.config.raft.LocalID = raft.ServerID(s.id)
+	s.config.dir = filepath.Join(s.config.baseDir, s.id)
 
 	// Wrap loggers
 	s.raftLogger = newLogger(ctx, "raft")
@@ -149,7 +140,7 @@ func (s *Server) Serve(addr string, ctx app.Ctx) error {
 	// Instantiate the Raft systems.
 	s.raft, err = raft.NewRaft(
 		&s.config.raft,
-		(*fsm)(s),
+		s.scheduler,
 		s.store,
 		s.store,
 		snapshots,
@@ -160,7 +151,7 @@ func (s *Server) Serve(addr string, ctx app.Ctx) error {
 	}
 
 	// Bootstrap cluster
-	if s.service != nil && len(s.service.Instances()) == 1 {
+	if s.service == nil || len(s.service.Instances()) == 0 {
 		s.ctx.Trace("s.schedule.bootstrap_clust", "Bootstrap cluster")
 
 		configuration := raft.Configuration{
@@ -192,7 +183,8 @@ func (s *Server) Drain() {
 	atomic.StoreUint32(&s.state, lnet.StateDrain)
 	s.mu.Unlock()
 
-	if s.isLeader() && s.numPeers() > 1 {
+	isLeader := s.isLeader()
+	if isLeader && s.numPeers() > 1 {
 		fn := s.raft.RemoveServer(raft.ServerID(s.config.raft.LocalID), 0, 0)
 		if err := fn.Error(); err != nil {
 			s.ctx.Warning(
@@ -205,6 +197,36 @@ func (s *Server) Drain() {
 
 	time.Sleep(s.config.leaveGracefulTime)
 
+	if !isLeader {
+		var left bool
+		limit := time.Now().Add(5 * time.Second)
+		for !left && time.Now().Before(limit) {
+			// Sleep a while before we check.
+			time.Sleep(50 * time.Millisecond)
+
+			// Get the latest configuration.
+			fn := s.raft.GetConfiguration()
+			if err := fn.Error(); err != nil {
+				s.ctx.Warning(
+					"s.schedule.drain.check_err",
+					"Failed to get raft configuration",
+					log.Error(err),
+				)
+				break
+			}
+
+			// Check whether the node is still in the list
+			left = true
+			for _, server := range fn.Configuration().Servers {
+				if string(server.ID) == s.id {
+					left = false
+					break
+				}
+			}
+		}
+	}
+
+	s.ctx.Trace("s.schedule.drain.shutdown", "Node has left the cluster, shutting down")
 	s.transport.Close()
 	fn := s.raft.Shutdown()
 	if err := fn.Error(); err != nil {
@@ -241,7 +263,7 @@ func (s *Server) AddPeer(id, addr string) error {
 		ID:   id,
 		Addr: addr,
 	})
-	f := s.raft.AddVoter(raft.ServerID(id), raft.ServerAddress(addr), 0, 0)
+	f := s.raft.AddVoter(raft.ServerID(id), raft.ServerAddress(addr), 0, time.Second*3)
 	if err := f.Error(); err != nil {
 		return errors.Wrap(err, "error joining cluster")
 	}
@@ -272,14 +294,11 @@ func (s *Server) RemovePeer(id string) error {
 		log.String("node_id", id),
 	)
 
-	peer, ok := s.peers.Load(id)
-	if !ok {
-		return nil
-	}
-	f := s.raft.RemovePeer(raft.ServerAddress(peer.Addr))
-	if err := f.Error(); err != nil {
+	fn := s.raft.RemoveServer(raft.ServerID(id), 0, 0)
+	if err := fn.Error(); err != nil {
 		return errors.Wrap(err, "error joining cluster")
 	}
+	s.peers.Delete(id)
 	return nil
 }
 
@@ -316,10 +335,6 @@ func (s *Server) watchPeers() {
 			continue
 		}
 
-		// Wait for node to be ready
-		// TODO: Implement ready endpoint
-		time.Sleep(3 * time.Second)
-
 		for _, evt := range events {
 			if evt.Instance.Local {
 				continue
@@ -332,7 +347,9 @@ func (s *Server) watchPeers() {
 			case disco.Update:
 				err = s.UpdatePeer(evt.Instance.ID, evt.Instance.Addr())
 			case disco.Delete:
-				err = s.RemovePeer(evt.Instance.ID)
+				if !evt.Instance.Local {
+					err = s.RemovePeer(evt.Instance.ID)
+				}
 			}
 
 			switch err {
