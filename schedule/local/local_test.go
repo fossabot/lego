@@ -1,6 +1,7 @@
 package local_test
 
 import (
+	"context"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -41,7 +42,7 @@ func Test_At(t *testing.T) {
 		t.Fatal("cannot start scheduler", err)
 	}
 
-	id, err := scheduler.In(time.Second, "foo", nil)
+	id, err := scheduler.In(context.TODO(), time.Second, "foo", nil)
 	if err != nil {
 		t.Error("cannot add job", err)
 	}
@@ -67,7 +68,7 @@ func Test_In(t *testing.T) {
 		t.Fatal("cannot start scheduler", err)
 	}
 
-	id, err := scheduler.At(time.Now().Add(time.Second), "foo", nil)
+	id, err := scheduler.At(context.TODO(), time.Now().Add(time.Second), "foo", nil)
 	if err != nil {
 		t.Error("cannot add job", err)
 	}
@@ -160,29 +161,29 @@ func Test_DequeueValidJobs(t *testing.T) {
 	}
 	defer dereg()
 
-	if _, err := scheduler.In(time.Millisecond*150, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Millisecond*150, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Millisecond*300, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Millisecond*300, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 
-	if _, err := scheduler.In(time.Second*5, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*5, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second*10, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*10, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second*15, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*15, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second*20, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*20, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 
 	time.Sleep(time.Millisecond * 10)
 
-	if _, err := scheduler.In(time.Millisecond*100, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Millisecond*100, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 
@@ -219,13 +220,13 @@ func Test_LeaveFutureJobs(t *testing.T) {
 	}
 	defer dereg()
 
-	if _, err := scheduler.In(time.Second*30, "foo", nil); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*30, "foo", nil); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second*60, "foo", nil); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*60, "foo", nil); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second*120, "foo", nil); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*120, "foo", nil); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 
@@ -264,7 +265,7 @@ func Test_LoadLog(t *testing.T) {
 	if err := scheduler.Start(); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
-	if _, err := scheduler.At(time.Now().Add(-1*time.Minute), "foo", nil); err != nil {
+	if _, err := scheduler.At(context.TODO(), time.Now().Add(-1*time.Minute), "foo", nil); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 	time.Sleep(500 * time.Millisecond)

@@ -1,6 +1,7 @@
 package schedule
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,9 +26,9 @@ type Scheduler interface {
 	Start() error
 
 	// At registers a job that will be executed at time t
-	At(t time.Time, target string, data []byte, o ...JobOption) (string, error)
+	At(ctx context.Context, t time.Time, target string, data []byte, o ...JobOption) (string, error)
 	// In registers a job that will be executed in duration d from now
-	In(d time.Duration, target string, data []byte, o ...JobOption) (string, error)
+	In(ctx context.Context, d time.Duration, target string, data []byte, o ...JobOption) (string, error)
 	// Cancel cancels a scheduled job.
 	// When an id does not exist or is from an already-executed job, Cancel will ignore
 	// the operation

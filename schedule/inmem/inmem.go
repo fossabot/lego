@@ -3,6 +3,7 @@ package inmem
 
 import (
 	"container/heap"
+	"context"
 	"errors"
 	"math"
 	"sync"
@@ -38,7 +39,11 @@ func (s *scheduler) Start() error {
 }
 
 func (s *scheduler) At(
-	t time.Time, target string, data []byte, o ...schedule.JobOption,
+	ctx context.Context,
+	t time.Time,
+	target string,
+	data []byte,
+	o ...schedule.JobOption,
 ) (string, error) {
 	j := schedule.BuildJob(o...)
 	j.Due = t.UnixNano()
@@ -56,9 +61,13 @@ func (s *scheduler) At(
 }
 
 func (s *scheduler) In(
-	d time.Duration, target string, data []byte, o ...schedule.JobOption,
+	ctx context.Context,
+	d time.Duration,
+	target string,
+	data []byte,
+	o ...schedule.JobOption,
 ) (string, error) {
-	return s.At(time.Now().Add(d), target, data, o...)
+	return s.At(ctx, time.Now().Add(d), target, data, o...)
 }
 
 func (s *scheduler) Register(

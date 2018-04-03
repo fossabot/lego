@@ -89,7 +89,7 @@ func (h *handler) scheduleJob(ctx journey.Ctx, w http.ResponseWriter, r *http.Re
 	j.Target = r.Params["target"]
 
 	// Schedule job
-	id, err := h.ctx.Schedule().In(j.In*time.Second, j.Target, []byte(j.Data))
+	id, err := h.ctx.Schedule().In(ctx, j.In*time.Second, j.Target, []byte(j.Data))
 	if err != nil {
 		ctx.Warning("schedule.create.err", "Error creating job", log.Error(err))
 		w.WriteHeader(http.StatusBadRequest)

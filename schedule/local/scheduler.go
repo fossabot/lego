@@ -3,6 +3,7 @@
 package local
 
 import (
+	"context"
 	"math"
 	"sync"
 	"time"
@@ -16,7 +17,6 @@ import (
 // - Reap expired jobs (e.g. done, lost, or stale) (> 1 week - debugging)
 // - Call subscriber in a go-routine
 // - Create a pool of go-routines for subscribers
-// - Update job (and the indices it impacts)
 
 const (
 	defaultUpdateBuffer = 16
@@ -77,8 +77,16 @@ func (s *scheduler) Start() error {
 }
 
 func (s *scheduler) At(
-	t time.Time, target string, data []byte, o ...schedule.JobOption,
+	ctx context.Context,
+	t time.Time,
+	target string,
+	data []byte,
+	o ...schedule.JobOption,
 ) (string, error) {
+	if target == "" {
+		return "", errors.New("missing schedule target")
+	}
+
 	j := schedule.BuildJob(o...)
 	j.Due = t.UnixNano()
 	j.Target = target
@@ -88,14 +96,18 @@ func (s *scheduler) At(
 	if err := s.storage.Save(pbj); err != nil {
 		return "", err
 	}
-	s.notifyUpdate(pbj)
+	s.notifyUpdate(ctx, pbj)
 	return j.ID, nil
 }
 
 func (s *scheduler) In(
-	d time.Duration, target string, data []byte, o ...schedule.JobOption,
+	ctx context.Context,
+	d time.Duration,
+	target string,
+	data []byte,
+	o ...schedule.JobOption,
 ) (string, error) {
-	return s.At(time.Now().Add(d), target, data, o...)
+	return s.At(ctx, time.Now().Add(d), target, data, o...)
 }
 
 func (s *scheduler) Register(
@@ -134,13 +146,7 @@ func (s *scheduler) process(j *pb.Job) {
 
 	if err := fn(j.Id, j.Data); err != nil {
 		s.failed(j, err)
-		return
 	}
-	s.succeed(j)
-}
-
-func (s *scheduler) succeed(j *pb.Job) {
-	// TODO: Mark job as updated
 }
 
 func (s *scheduler) failed(j *pb.Job, err error) {
@@ -163,7 +169,7 @@ func (s *scheduler) failed(j *pb.Job, err error) {
 	j.Attempt++
 	j.Due += int64(backoff)
 	s.storage.Save(j)
-	s.notifyUpdate(j)
+	s.notifyUpdate(context.Background(), j)
 }
 
 func (s *scheduler) watchJobs() {
@@ -209,16 +215,17 @@ func (s *scheduler) watchJobs() {
 		}
 
 		// TODO: Add to heap with `to`` (upper bound)
+		// TODO: Check age limit
 		for _, j := range jobs {
 			s.process(j)
 		}
 	}
 }
 
-func (s *scheduler) notifyUpdate(j *pb.Job) {
-	// TODO: Use context in case the request timed out
+func (s *scheduler) notifyUpdate(ctx context.Context, j *pb.Job) {
 	select {
 	case s.updatec <- j:
+	case <-ctx.Done():
 	case <-s.stopc:
 	}
 }

@@ -1,6 +1,7 @@
 package inmem_test
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ func TestInMem_ScheduleJob(t *testing.T) {
 	}
 
 	for i := 0; i < 20; i++ {
-		id, err := scheduler.In(time.Millisecond, "foo", nil)
+		id, err := scheduler.In(context.TODO(), time.Millisecond, "foo", nil)
 		if err != nil {
 			t.Fatal("cannot schedule new job", err)
 		}
@@ -108,28 +109,28 @@ func TestInMem_DequeueValidJobs(t *testing.T) {
 	}
 	defer dereg()
 
-	if _, err := scheduler.At(time.Now(), "foo", expect); err != nil {
+	if _, err := scheduler.At(context.TODO(), time.Now(), "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.At(time.Now(), "foo", expect); err != nil {
+	if _, err := scheduler.At(context.TODO(), time.Now(), "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second*2, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*2, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second*4, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*4, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second*8, "foo", expect); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*8, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 
 	time.Sleep(time.Millisecond * 10)
 
-	if _, err := scheduler.At(time.Now(), "foo", expect); err != nil {
+	if _, err := scheduler.At(context.TODO(), time.Now(), "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 
@@ -159,13 +160,13 @@ func TestInMem_LeaveFutureJobs(t *testing.T) {
 	}
 	defer dereg()
 
-	if _, err := scheduler.In(time.Second*30, "foo", nil); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*30, "foo", nil); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second*60, "foo", nil); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*60, "foo", nil); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(time.Second*120, "foo", nil); err != nil {
+	if _, err := scheduler.In(context.TODO(), time.Second*120, "foo", nil); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 
