@@ -1,7 +1,6 @@
 package local
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,13 +21,13 @@ const (
 )
 
 var (
-	eventBucket   = []byte("event")
-	eventIxBucket = []byte("event-index")
-	logBucket     = []byte("log")
+	eventBucket     = []byte("event")
+	partitionBucket = []byte("partition")
+	logBucket       = []byte("log")
 
 	bucketKeys = [][]byte{
 		eventBucket,
-		eventIxBucket,
+		partitionBucket,
 		logBucket,
 	}
 
@@ -75,44 +74,41 @@ func (s *storage) Save(e *pb.Event) error {
 		return errDatabaseClosed
 	}
 
+	e.Id = e.Job.Id + "/" + strconv.FormatUint(uint64(e.Attempt), 10)
 	evtData, err := proto.Marshal(e)
 	if err != nil {
 		return errors.Wrap(err, "error marshalling event")
 	}
 
-	ixKey := indexKey(e.Due)
+	partKey := partitionKey(e.Due)
 	eventKey := eventKey(e)
 
 	return s.db.Batch(func(tx *bolt.Tx) error {
-		indices := tx.Bucket(eventIxBucket)
+		parts := tx.Bucket(partitionBucket)
 		events := tx.Bucket(eventBucket)
 
-		// Load and add event to index
-		ix := pb.Index{}
-		ixData := indices.Get(ixKey)
-		if len(ixData) > 0 {
-			if err := proto.Unmarshal(ixData, &ix); err != nil {
+		// Add event to partition
+		part := pb.Partition{}
+		partData := parts.Get(partKey)
+		if len(partData) > 0 {
+			if err := proto.Unmarshal(partData, &part); err != nil {
 				return errors.Wrap(err, "error unmarshalling index")
 			}
 		}
-		if ix.From == 0 {
-			ix.From = (e.Due - (abs(e.Due) % partitionBy))
+		if part.From == 0 && part.To == 0 {
+			part.From, part.To = partitionRange(e.Due)
 		}
-		if ix.To == 0 {
-			ix.To = (e.Due - (abs(e.Due) % partitionBy) + partitionBy - 1)
-		}
-		ix.Keys = append(ix.Keys, string(eventKey))
-		sort.Strings(ix.Keys)
-		ixData, err := proto.Marshal(&ix)
+		part.Keys = append(part.Keys, string(eventKey))
+		sort.Strings(part.Keys)
+		partData, err := proto.Marshal(&part)
 		if err != nil {
 			return errors.Wrap(err, "error marshalling index")
 		}
 
-		// Persist event and index
 		if err := events.Put(eventKey, evtData); err != nil {
 			return errors.Wrap(err, "error creating event record")
 		}
-		if err := indices.Put(ixKey, ixData); err != nil {
+		if err := parts.Put(partKey, partData); err != nil {
 			return errors.Wrap(err, "error updating index record")
 		}
 		return nil
@@ -124,26 +120,26 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 		return nil, 0, errDatabaseClosed
 	}
 
-	start := (from - (abs(from) % partitionBy))
-	end := (to - (abs(to) % partitionBy))
+	start, _ := partitionRange(from)
+	end, _ := partitionRange(to)
 	next = end + 1
 
 	return l, next, s.db.Batch(func(tx *bolt.Tx) error {
-		indices := tx.Bucket(eventIxBucket)
+		parts := tx.Bucket(partitionBucket)
 		events := tx.Bucket(eventBucket)
 		logs := tx.Bucket(logBucket)
 
 		for t := start; t <= end; t += partitionBy {
-			ixKey := indexKey(t)
-			ix := pb.Index{}
-			ixData := indices.Get(ixKey)
-			if len(ixData) > 0 {
-				if err := proto.Unmarshal(ixData, &ix); err != nil {
+			partKey := partitionKey(t)
+			part := pb.Partition{}
+			partData := parts.Get(partKey)
+			if len(partData) > 0 {
+				if err := proto.Unmarshal(partData, &part); err != nil {
 					return errors.Wrap(err, "error unmarshalling index")
 				}
 			}
 
-			for _, key := range ix.Keys {
+			for _, key := range part.Keys {
 				e := pb.Event{}
 				if err := proto.Unmarshal(events.Get([]byte(key)), &e); err != nil {
 					return errors.Wrap(err, "error unmarshalling event")
@@ -157,9 +153,11 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 			}
 		}
 
+		froms := strconv.FormatInt(from, 10)
+		tos := strconv.FormatInt(to, 10)
 		err := logs.Put(
-			[]byte(strconv.FormatInt(to, 10)),
-			[]byte(fmt.Sprintf("%d-%d", from, to)),
+			[]byte(tos),
+			[]byte(froms+"-"+tos),
 		)
 		if err != nil {
 			return errors.Wrap(err, "error creating log record")
@@ -189,26 +187,22 @@ func (s *storage) Close() error {
 	return s.db.Close()
 }
 
-type partition struct {
-	Min int64
-	Max int64
-	L   []*pb.Job
-}
-
-func (p *partition) InRange(i int64) bool {
-	return p.Min <= i && i <= p.Max
-}
-
-func indexKey(t int64) []byte {
-	rem := t % partitionBy
-	return []byte(strconv.FormatInt(t-rem, 10))
-}
-
 func eventKey(e *pb.Event) []byte {
 	return []byte(strings.Join([]string{
 		strconv.FormatInt(e.Due, 10),
 		e.Id,
 	}, "/"))
+}
+
+func partitionKey(t int64) []byte {
+	from, _ := partitionRange(t)
+	return []byte(strconv.FormatInt(from, 10))
+}
+
+func partitionRange(t int64) (int64, int64) {
+	from := t - (abs(t) % partitionBy)
+	to := from + partitionBy - 1
+	return from, to
 }
 
 func abs(i int64) int64 {

@@ -88,7 +88,6 @@ func (s *scheduler) At(
 	j.Data = data
 
 	e := pb.Event{
-		Id:      j.ID + "/1",
 		Due:     j.Due,
 		Attempt: 1,
 		Job:     toPB(j),
@@ -158,13 +157,15 @@ func (s *scheduler) process(e *pb.Event) {
 
 	// Generate next attempt
 	backoff := int64(time.Second) * int64(math.Pow(2, float64(e.Attempt)))
-	jitter := seededRand.Int63n(j.Options.MinBackOff)
 	if backoff < j.Options.MinBackOff {
 		backoff = j.Options.MinBackOff
 	} else if backoff > j.Options.MaxBackOff {
 		backoff = j.Options.MaxBackOff
-		jitter *= -1
 	}
+	jitter := min(
+		seededRand.Int63n(j.Options.MinBackOff*int64(e.Attempt)),
+		j.Options.MaxBackOff,
+	)
 
 	next := pb.Event{
 		Due:     e.Due + backoff + jitter,
@@ -226,7 +227,6 @@ func (s *scheduler) watchEvents() {
 		}
 
 		// TODO: Add to heap with `to`` (upper bound)
-		// TODO: Check age limit
 		for _, j := range jobs {
 			s.process(j)
 		}
@@ -271,4 +271,11 @@ func toPB(j *schedule.Job) *pb.Job {
 		Data:    j.Data,
 		Options: &o,
 	}
+}
+
+func min(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
 }

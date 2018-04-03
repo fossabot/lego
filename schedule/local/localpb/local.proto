@@ -1,7 +1,8 @@
 syntax = "proto3";
 package local;
 
-message Index {
+// A Partition stores event keys within a specific time range
+message Partition {
   int64 from = 1;
   int64 to = 2;
   repeated string keys = 3;
