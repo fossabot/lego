@@ -13,6 +13,24 @@ import (
 	"github.com/stairlin/lego/schedule"
 )
 
+// TODO:
+// - Reap expired jobs (e.g. done, lost, or stale)
+// - Job states
+//   - Pending (attempt n)
+//   - Running
+//   - Succeed
+//   - Failed (lost or stale)
+//
+//   Each job transition should be proposed to the raft cluster.
+//
+// - Consistency guarantee:
+//     AtMostOnce:
+//       When a job is stuck in running, because a failure occured, it should be
+//       marked as failed, because we don't know whether it was executed or not
+//     AtLeastOnce:
+//       When a job is stuck in running, because a failure occured, it should be
+//       re-run again on the same attempt, because we don't know whether it was executed or not
+
 // scheduler is the raft state machine that coordinates job execution
 type scheduler struct {
 	mu  sync.RWMutex

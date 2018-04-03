@@ -22,10 +22,4 @@ message JobOptions {
   int64 minBackOff = 2;
   int64 maxBackOff = 3;
   int64 ageLimit = 4;
-  Consistency consistency = 5;
-}
-
-enum Consistency {
-  AtMostOnce = 0;
-  AtLeastOnce = 1;
 }

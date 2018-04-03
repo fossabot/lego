@@ -214,6 +214,7 @@ func (a *App) Close() error {
 }
 
 func (a *App) close() {
+	a.ctx.Schedule().Close()
 	a.ctx.Cancel()
 
 	a.done <- true
