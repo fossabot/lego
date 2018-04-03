@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -47,6 +48,13 @@ func start(app *lego.App) error {
 			log.String("job_data", string(data)),
 		)
 		return nil
+	})
+	scheduler.Register("err", func(id string, data []byte) error {
+		app.Ctx().Trace("schedule.process", "Process job",
+			log.String("job_id", id),
+			log.String("job_data", string(data)),
+		)
+		return errors.New("job failed")
 	})
 	app.Ctx().SetSchedule(scheduler)
 

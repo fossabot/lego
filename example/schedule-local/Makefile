@@ -6,3 +6,9 @@ schedule:
 				-H 'Content-Type: application/json; charset=utf-8' \
 				-d '{"In": 10, "Data": "Random data"}'
 		@echo ""
+
+schedule-err:
+		@curl -X "POST" "http://localhost:3000/job/err" \
+				-H 'Content-Type: application/json; charset=utf-8' \
+				-d '{"In": 10, "Data": "Random data"}'
+		@echo ""

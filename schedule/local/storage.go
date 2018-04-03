@@ -22,13 +22,13 @@ const (
 )
 
 var (
-	jobBucket   = []byte("job")
-	jobIxBucket = []byte("job-index")
-	logBucket   = []byte("log")
+	eventBucket   = []byte("event")
+	eventIxBucket = []byte("event-index")
+	logBucket     = []byte("log")
 
 	bucketKeys = [][]byte{
-		jobBucket,
-		jobIxBucket,
+		eventBucket,
+		eventIxBucket,
 		logBucket,
 	}
 
@@ -70,24 +70,24 @@ func (s *storage) Open(path string) error {
 }
 
 // Save persists j to the local database and update the index
-func (s *storage) Save(j *pb.Job) error {
+func (s *storage) Save(e *pb.Event) error {
 	if atomic.LoadUint32(&s.state) == 0 {
 		return errDatabaseClosed
 	}
 
-	jobData, err := proto.Marshal(j)
+	evtData, err := proto.Marshal(e)
 	if err != nil {
-		return errors.Wrap(err, "error marshalling job")
+		return errors.Wrap(err, "error marshalling event")
 	}
 
-	ixKey := indexKey(j.Due)
-	jobKey := jobKey(j)
+	ixKey := indexKey(e.Due)
+	eventKey := eventKey(e)
 
 	return s.db.Batch(func(tx *bolt.Tx) error {
-		indices := tx.Bucket(jobIxBucket)
-		jobs := tx.Bucket(jobBucket)
+		indices := tx.Bucket(eventIxBucket)
+		events := tx.Bucket(eventBucket)
 
-		// Load and add job to index
+		// Load and add event to index
 		ix := pb.Index{}
 		ixData := indices.Get(ixKey)
 		if len(ixData) > 0 {
@@ -95,22 +95,22 @@ func (s *storage) Save(j *pb.Job) error {
 				return errors.Wrap(err, "error unmarshalling index")
 			}
 		}
-		if ix.Min == 0 {
-			ix.Min = (j.Due - (abs(j.Due) % partitionBy))
+		if ix.From == 0 {
+			ix.From = (e.Due - (abs(e.Due) % partitionBy))
 		}
-		if ix.Max == 0 {
-			ix.Max = (j.Due - (abs(j.Due) % partitionBy) + partitionBy - 1)
+		if ix.To == 0 {
+			ix.To = (e.Due - (abs(e.Due) % partitionBy) + partitionBy - 1)
 		}
-		ix.Keys = append(ix.Keys, string(jobKey))
+		ix.Keys = append(ix.Keys, string(eventKey))
 		sort.Strings(ix.Keys)
 		ixData, err := proto.Marshal(&ix)
 		if err != nil {
 			return errors.Wrap(err, "error marshalling index")
 		}
 
-		// Persist job and index
-		if err := jobs.Put(jobKey, jobData); err != nil {
-			return errors.Wrap(err, "error creating job record")
+		// Persist event and index
+		if err := events.Put(eventKey, evtData); err != nil {
+			return errors.Wrap(err, "error creating event record")
 		}
 		if err := indices.Put(ixKey, ixData); err != nil {
 			return errors.Wrap(err, "error updating index record")
@@ -119,7 +119,7 @@ func (s *storage) Save(j *pb.Job) error {
 	})
 }
 
-func (s *storage) Load(from, to int64) (l []*pb.Job, next int64, err error) {
+func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 	if atomic.LoadUint32(&s.state) == 0 {
 		return nil, 0, errDatabaseClosed
 	}
@@ -129,8 +129,8 @@ func (s *storage) Load(from, to int64) (l []*pb.Job, next int64, err error) {
 	next = end + 1
 
 	return l, next, s.db.Batch(func(tx *bolt.Tx) error {
-		indices := tx.Bucket(jobIxBucket)
-		jobs := tx.Bucket(jobBucket)
+		indices := tx.Bucket(eventIxBucket)
+		events := tx.Bucket(eventBucket)
 		logs := tx.Bucket(logBucket)
 
 		for t := start; t <= end; t += partitionBy {
@@ -144,15 +144,15 @@ func (s *storage) Load(from, to int64) (l []*pb.Job, next int64, err error) {
 			}
 
 			for _, key := range ix.Keys {
-				j := pb.Job{}
-				if err := proto.Unmarshal(jobs.Get([]byte(key)), &j); err != nil {
-					return errors.Wrap(err, "error unmarshalling job")
+				e := pb.Event{}
+				if err := proto.Unmarshal(events.Get([]byte(key)), &e); err != nil {
+					return errors.Wrap(err, "error unmarshalling event")
 				}
-				if from <= j.Due && j.Due <= to {
-					l = append(l, &j)
+				if from <= e.Due && e.Due <= to {
+					l = append(l, &e)
 				}
-				if to < j.Due && j.Due < next {
-					next = j.Due
+				if to < e.Due && e.Due < next {
+					next = e.Due
 				}
 			}
 		}
@@ -204,10 +204,10 @@ func indexKey(t int64) []byte {
 	return []byte(strconv.FormatInt(t-rem, 10))
 }
 
-func jobKey(j *pb.Job) []byte {
+func eventKey(e *pb.Event) []byte {
 	return []byte(strings.Join([]string{
-		strconv.FormatInt(j.Due, 10),
-		j.Id,
+		strconv.FormatInt(e.Due, 10),
+		e.Id,
 	}, "/"))
 }
 

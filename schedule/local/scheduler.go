@@ -5,6 +5,7 @@ package local
 import (
 	"context"
 	"math"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -14,12 +15,16 @@ import (
 )
 
 // TODO:
-// - Reap expired jobs (e.g. done, lost, or stale) (> 1 week - debugging)
+// - Reap jobs (keep window of 1 week for debugging purpose)
 // - Call subscriber in a go-routine
 // - Create a pool of go-routines for subscribers
 
 const (
 	defaultUpdateBuffer = 16
+)
+
+var (
+	seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 type scheduler struct {
@@ -29,7 +34,7 @@ type scheduler struct {
 	registrations map[string]func(string, []byte) error
 	storage       *storage
 
-	updatec chan *pb.Job
+	updatec chan *pb.Event
 	stopc   chan struct{}
 }
 
@@ -37,8 +42,6 @@ type scheduler struct {
 type Config struct {
 	// DB is the path to the database file
 	DB string
-	// InitialWindow defines how far in the past the initial load should go
-	InitialWindow time.Duration
 }
 
 // NewScheduler creates a scheduler that persists data locally.
@@ -48,9 +51,6 @@ func NewScheduler(c Config) schedule.Scheduler {
 	if c.DB == "" {
 		c.DB = "schedule.local.db"
 	}
-	if c.InitialWindow == 0 {
-		c.InitialWindow = time.Second
-	}
 	return &scheduler{
 		config:        c,
 		registrations: make(map[string]func(string, []byte) error),
@@ -59,7 +59,7 @@ func NewScheduler(c Config) schedule.Scheduler {
 
 // Open opens the storage
 func (s *scheduler) Start() error {
-	s.updatec = make(chan *pb.Job, defaultUpdateBuffer)
+	s.updatec = make(chan *pb.Event, defaultUpdateBuffer)
 	s.stopc = make(chan struct{})
 
 	s.storage = &storage{}
@@ -67,12 +67,7 @@ func (s *scheduler) Start() error {
 		return err
 	}
 
-	last := s.storage.LastLoad()
-	if last != 0 {
-		s.config.InitialWindow = time.Duration(time.Now().UnixNano() - last + 1)
-	}
-
-	go s.watchJobs()
+	go s.watchEvents()
 	return nil
 }
 
@@ -92,11 +87,16 @@ func (s *scheduler) At(
 	j.Target = target
 	j.Data = data
 
-	pbj := toPB(j)
-	if err := s.storage.Save(pbj); err != nil {
+	e := pb.Event{
+		Id:      j.ID + "/1",
+		Due:     j.Due,
+		Attempt: 1,
+		Job:     toPB(j),
+	}
+	if err := s.storage.Save(&e); err != nil {
 		return "", err
 	}
-	s.notifyUpdate(ctx, pbj)
+	s.notifyUpdate(ctx, &e)
 	return j.ID, nil
 }
 
@@ -135,7 +135,15 @@ func (s *scheduler) Close() error {
 	return nil
 }
 
-func (s *scheduler) process(j *pb.Job) {
+func (s *scheduler) process(e *pb.Event) {
+	expired := e.Job.Options.AgeLimit != -1 &&
+		time.Now().UnixNano() > e.Job.Due+e.Job.Options.AgeLimit
+	if expired {
+		return
+	}
+
+	j := e.Job
+
 	s.mu.RLock()
 	fn, ok := s.registrations[j.Target]
 	s.mu.RUnlock()
@@ -144,36 +152,39 @@ func (s *scheduler) process(j *pb.Job) {
 		return
 	}
 
-	if err := fn(j.Id, j.Data); err != nil {
-		s.failed(j, err)
-	}
-}
-
-func (s *scheduler) failed(j *pb.Job, err error) {
-	// TODO: Due is updated, so AgeLimit cannot work. Store initial due time
-
-	now := time.Now().UnixNano()
-	lost := j.Attempt >= j.Options.RetryLimit
-	stale := j.Options.AgeLimit != -1 && now-j.Due > j.Options.AgeLimit
-	if lost || stale {
+	if err := fn(e.Job.Id, e.Job.Data); err == nil {
 		return
 	}
 
-	// Push back to storage
-	backoff := int64(time.Second) * int64(math.Pow(2, float64(j.Attempt)))
+	// Generate next attempt
+	backoff := int64(time.Second) * int64(math.Pow(2, float64(e.Attempt)))
+	jitter := seededRand.Int63n(j.Options.MinBackOff)
 	if backoff < j.Options.MinBackOff {
 		backoff = j.Options.MinBackOff
 	} else if backoff > j.Options.MaxBackOff {
 		backoff = j.Options.MaxBackOff
+		jitter *= -1
 	}
-	j.Attempt++
-	j.Due += int64(backoff)
-	s.storage.Save(j)
-	s.notifyUpdate(context.Background(), j)
+
+	next := pb.Event{
+		Due:     e.Due + backoff + jitter,
+		Attempt: e.Attempt + 1,
+		Job:     e.Job,
+	}
+
+	if next.Attempt > j.Options.RetryLimit {
+		return
+	}
+	if j.Options.AgeLimit != -1 && next.Due > j.Options.AgeLimit {
+		return
+	}
+
+	s.storage.Save(&next)
+	s.notifyUpdate(context.Background(), &next)
 }
 
-func (s *scheduler) watchJobs() {
-	from := time.Now().Add(-1 * s.config.InitialWindow).UnixNano()
+func (s *scheduler) watchEvents() {
+	from := s.storage.LastLoad() + 1
 	for {
 		s.flushUpdates()
 
@@ -222,9 +233,9 @@ func (s *scheduler) watchJobs() {
 	}
 }
 
-func (s *scheduler) notifyUpdate(ctx context.Context, j *pb.Job) {
+func (s *scheduler) notifyUpdate(ctx context.Context, e *pb.Event) {
 	select {
-	case s.updatec <- j:
+	case s.updatec <- e:
 	case <-ctx.Done():
 	case <-s.stopc:
 	}

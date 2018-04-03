@@ -2,24 +2,35 @@ syntax = "proto3";
 package local;
 
 message Index {
-  int64 min = 1;
-  int64 max = 2;
+  int64 from = 1;
+  int64 to = 2;
   repeated string keys = 3;
 }
 
+// A Job is a one-time task definition
 message Job {
 	string id = 1;
   string target = 2;
   int64 due = 3;
   bytes data = 4;
-  uint32 attempt = 5;
 
   JobOptions options = 15;
 }
 
+// JobOptions contains job execution options
 message JobOptions {
   uint32 retryLimit = 1;
   int64 minBackOff = 2;
   int64 maxBackOff = 3;
   int64 ageLimit = 4;
+}
+
+// An Event is an occurence of a job executed at a specific time.
+// There is one event per job execution.
+message Event {
+  string id = 1;
+  int64 due = 2;
+  uint32 attempt = 3;
+
+  Job job = 15;
 }
