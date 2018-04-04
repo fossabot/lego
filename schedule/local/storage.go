@@ -43,6 +43,16 @@ type storage struct {
 	state  uint32
 	db     *bolt.DB
 	crypto *crypto.Rotor
+
+	checkpoint int64
+}
+
+func newStorage(c *EncryptionConfig) *storage {
+	storage := &storage{}
+	if c != nil {
+		storage.crypto = crypto.NewRotor(c.Keys, c.Default)
+	}
+	return storage
 }
 
 // Open opens the database. This function must be called first.
@@ -72,6 +82,8 @@ func (s *storage) Open(path string) error {
 
 	atomic.StoreUint32(&s.state, 1)
 	s.db = db
+
+	s.checkpoint = s.loadLastCheckpoint()
 	return nil
 }
 
@@ -82,15 +94,20 @@ func (s *storage) Save(e *pb.Event) error {
 	}
 
 	e.Id = e.Job.Id + "/" + strconv.FormatUint(uint64(e.Attempt), 10)
-	evtData, err := s.marshal(e)
-	if err != nil {
-		return ErrMarshalling
-	}
-
-	partKey := partitionKey(e.Due)
-	eventKey := eventKey(e)
 
 	return s.db.Batch(func(tx *bolt.Tx) error {
+		if e.Due < s.checkpoint {
+			// Postpone event to make sure it will be executed
+			e.Due = s.checkpoint
+		}
+		evtData, err := s.marshal(e)
+		if err != nil {
+			return ErrMarshalling
+		}
+
+		partKey := partitionKey(e.Due)
+		eventKey := eventKey(e)
+
 		parts := tx.Bucket(partitionBucket)
 		events := tx.Bucket(eventBucket)
 
@@ -103,11 +120,12 @@ func (s *storage) Save(e *pb.Event) error {
 			}
 		}
 		if part.From == 0 && part.To == 0 {
-			part.From, part.To = partitionRange(e.Due)
+			part.From = partitionStart(e.Due)
+			part.To = partitionEnd(e.Due)
 		}
 		part.Keys = append(part.Keys, string(eventKey))
 		sort.Strings(part.Keys)
-		partData, err := s.marshal(&part)
+		partData, err = s.marshal(&part)
 		if err != nil {
 			return ErrMarshalling
 		}
@@ -122,23 +140,24 @@ func (s *storage) Save(e *pb.Event) error {
 	})
 }
 
-// Load loads events due within the given range and return the time on which
-// the next event is due.
-func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
+// Load loads events due from the last checkpoint to t
+func (s *storage) Load(t int64) (l []*pb.Event, next int64, err error) {
 	if atomic.LoadUint32(&s.state) == 0 {
 		return nil, 0, errDatabaseClosed
 	}
 
-	start, _ := partitionRange(from)
-	end, _ := partitionRange(to)
-	next = end + 1
-
 	return l, next, s.db.Batch(func(tx *bolt.Tx) error {
+		from := s.checkpoint
+		to := t
+		s.checkpoint = t + 1
+
+		next = partitionEnd(t) + 1
+
 		parts := tx.Bucket(partitionBucket)
 		events := tx.Bucket(eventBucket)
 		checkpoints := tx.Bucket(checkpointBuckets)
 
-		for t := start; t <= end; t += partitionBy {
+		for t := partitionStart(from); t <= partitionStart(to); t += partitionBy {
 			partKey := partitionKey(t)
 			part := pb.Partition{}
 			partData := parts.Get(partKey)
@@ -181,8 +200,7 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 	})
 }
 
-// LastCheckpoint returns the upper bound of the last load range.
-func (s *storage) LastCheckpoint() (t int64) {
+func (s *storage) loadLastCheckpoint() (t int64) {
 	// Default value to make sure old events won't be re-processed
 	t = time.Now().UnixNano()
 
@@ -247,14 +265,16 @@ func eventKey(e *pb.Event) []byte {
 }
 
 func partitionKey(t int64) []byte {
-	from, _ := partitionRange(t)
-	return []byte(strconv.FormatInt(from, 10))
+	return []byte(strconv.FormatInt(partitionStart(t), 10))
 }
 
-func partitionRange(t int64) (int64, int64) {
-	from := t - (abs(t) % partitionBy)
-	to := from + partitionBy - 1
-	return from, to
+func partitionStart(t int64) int64 {
+	return t - (abs(t) % partitionBy)
+}
+
+func partitionEnd(t int64) int64 {
+	to := partitionStart(t) + partitionBy - 1
+	return to
 }
 
 func abs(i int64) int64 {

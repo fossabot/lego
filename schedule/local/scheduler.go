@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/stairlin/lego/crypto"
 	"github.com/stairlin/lego/schedule"
 	pb "github.com/stairlin/lego/schedule/local/localpb"
 )
@@ -31,13 +30,15 @@ var (
 type scheduler struct {
 	mu sync.RWMutex
 
-	config    Config
-	handlers  map[string]func(string, []byte) error
-	storage   *storage
-	processor *processor
+	config   Config
+	handlers map[string]func(string, []byte) error
 
-	updatec chan *pb.Event
-	stopc   chan struct{}
+	// storage takes care of job/event/index persistence
+	storage *storage
+	// processor is a pool of goroutines that process events in parallel
+	processor *processor
+	// watcher watches for events to process
+	watcher *watcher
 }
 
 // Config is the local scheduler configuration
@@ -79,25 +80,15 @@ func NewScheduler(c Config) schedule.Scheduler {
 }
 
 func (s *scheduler) Start() error {
-	s.updatec = make(chan *pb.Event, defaultUpdateBuffer)
-	s.stopc = make(chan struct{})
-	s.processor = &processor{
-		n:       s.config.Workers,
-		bucketc: make(chan *pb.Event),
-		process: s.process,
-	}
-	s.storage = &storage{}
-	if s.config.Encryption != nil {
-		enc := s.config.Encryption
-		s.storage.crypto = crypto.NewRotor(enc.Keys, enc.Default)
-	}
+	s.processor = newProcessor(s.config.Workers, s.process)
+	s.storage = newStorage(s.config.Encryption)
+	s.watcher = newWatcher(s.storage, s.processor.Exec())
 
 	if err := s.storage.Open(s.config.DB); err != nil {
 		return err
 	}
 	s.processor.Start()
-
-	go s.watchEvents()
+	s.watcher.Start()
 	return nil
 }
 
@@ -125,7 +116,7 @@ func (s *scheduler) At(
 	if err := s.storage.Save(&e); err != nil {
 		return "", err
 	}
-	s.notifyUpdate(ctx, &e)
+	s.watcher.Notify(e.Due)
 	return j.ID, nil
 }
 
@@ -157,13 +148,12 @@ func (s *scheduler) HandleFunc(
 }
 
 func (s *scheduler) Drain() {
-	close(s.stopc)
+	s.watcher.Close()
 	s.processor.Close()
 }
 
 func (s *scheduler) Close() error {
 	s.storage.Close()
-	close(s.updatec)
 	return nil
 }
 
@@ -208,7 +198,7 @@ func (s *scheduler) process(e *pb.Event) {
 	}
 
 	s.storage.Save(&next)
-	s.notifyUpdate(context.Background(), &next)
+	s.watcher.Notify(next.Due)
 }
 
 func (s *scheduler) handler(target string) func(string, []byte) error {
@@ -219,77 +209,6 @@ func (s *scheduler) handler(target string) func(string, []byte) error {
 		return voidFn
 	}
 	return fn
-}
-
-func (s *scheduler) watchEvents() {
-	from := s.storage.LastCheckpoint() + 1
-	for {
-		select {
-		case <-s.stopc:
-			return
-		default:
-		}
-		s.flushUpdates()
-
-		to := time.Now().UnixNano()
-		jobs, next, err := s.storage.Load(from, to)
-		switch err {
-		case nil:
-		case errDatabaseClosed:
-			return
-		default:
-			select {
-			case <-time.Tick(time.Second):
-				continue
-			case <-s.stopc:
-				return
-			}
-		}
-		prev := from
-		from = to + 1
-
-		if len(jobs) == 0 {
-			d := time.Duration(next - time.Now().UnixNano())
-			if d <= 0 {
-				continue
-			}
-
-			select {
-			case <-time.Tick(d):
-				continue
-			case j := <-s.updatec:
-				if prev <= j.Due && j.Due <= to {
-					jobs = append(jobs, j)
-				} else {
-					continue
-				}
-			case <-s.stopc:
-				return
-			}
-		}
-
-		for i := range jobs {
-			s.processor.Exec(jobs[i])
-		}
-	}
-}
-
-func (s *scheduler) notifyUpdate(ctx context.Context, e *pb.Event) {
-	select {
-	case s.updatec <- e:
-	case <-ctx.Done():
-	case <-s.stopc:
-	}
-}
-
-func (s *scheduler) flushUpdates() {
-	for {
-		select {
-		case <-s.updatec:
-		default:
-			return
-		}
-	}
 }
 
 // toPB converts a schedule.Job to its protobuf counter part

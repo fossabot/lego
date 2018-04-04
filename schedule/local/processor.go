@@ -11,6 +11,14 @@ type processor struct {
 	process func(e *pb.Event)
 }
 
+func newProcessor(n int, fn func(e *pb.Event)) *processor {
+	return &processor{
+		n:       n,
+		bucketc: make(chan *pb.Event),
+		process: fn,
+	}
+}
+
 func (p *processor) Start() {
 	for i := 0; i < p.n; i++ {
 		go func() {
@@ -22,9 +30,8 @@ func (p *processor) Start() {
 	}
 }
 
-// Exec executes fn in background
-func (p *processor) Exec(e *pb.Event) {
-	p.bucketc <- e
+func (p *processor) Exec() chan<- *pb.Event {
+	return p.bucketc
 }
 
 // Close drains the bucket and stop
