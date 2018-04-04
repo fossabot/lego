@@ -36,8 +36,15 @@ func main() {
 
 func start(app *lego.App) error {
 	// Create scheduler
+	keys := map[uint32][]byte{}
+	keys[0] = []byte("fe1e22b23c90b4fb1f9b758979d9c06c")
+
 	scheduler := local.NewScheduler(local.Config{
 		DB: "schedule.db",
+		Encryption: &local.EncryptionConfig{
+			Default: 0,
+			Keys:    keys,
+		},
 	})
 	if err := scheduler.Start(); err != nil {
 		return err

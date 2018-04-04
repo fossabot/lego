@@ -10,21 +10,25 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stairlin/lego/crypto"
 	"github.com/stairlin/lego/schedule"
 	pb "github.com/stairlin/lego/schedule/local/localpb"
 )
 
 // TODO:
+// - Heap (unit of work)
+// - Encrypt data
 // - Reap jobs (keep window of 1 week for debugging purpose)
-// - Call subscriber in a go-routine
-// - Create a pool of go-routines for subscribers
 
 const (
+	defaultDB           = "schedule.local.db"
 	defaultUpdateBuffer = 16
+	defaultWorkers      = 4
 )
 
 var (
 	seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+	voidFn     = func(string, []byte) error { return nil }
 )
 
 type scheduler struct {
@@ -33,6 +37,7 @@ type scheduler struct {
 	config        Config
 	registrations map[string]func(string, []byte) error
 	storage       *storage
+	workers       *pool
 
 	updatec chan *pb.Event
 	stopc   chan struct{}
@@ -42,6 +47,18 @@ type scheduler struct {
 type Config struct {
 	// DB is the path to the database file
 	DB string
+	// Workers is the maximum number of goroutines that process jobs in parallel
+	Workers int
+	// Encryption activates data encryption
+	Encryption *EncryptionConfig
+}
+
+// EncryptionConfig is the configuration to encrypt data stored
+type EncryptionConfig struct {
+	// Default is the default key ID to use
+	Default uint32
+	// Keys contains all encryption keys available
+	Keys map[uint32][]byte
 }
 
 // NewScheduler creates a scheduler that persists data locally.
@@ -49,7 +66,10 @@ type Config struct {
 // running multiple lego instances.
 func NewScheduler(c Config) schedule.Scheduler {
 	if c.DB == "" {
-		c.DB = "schedule.local.db"
+		c.DB = defaultDB
+	}
+	if c.Workers == 0 {
+		c.Workers = defaultWorkers
 	}
 	return &scheduler{
 		config:        c,
@@ -63,9 +83,14 @@ func (s *scheduler) Start() error {
 	s.stopc = make(chan struct{})
 
 	s.storage = &storage{}
+	if s.config.Encryption != nil {
+		enc := s.config.Encryption
+		s.storage.crypto = crypto.NewRotor(enc.Keys, enc.Default)
+	}
 	if err := s.storage.Open(s.config.DB); err != nil {
 		return err
 	}
+	s.workers = newPool(s.config.Workers)
 
 	go s.watchEvents()
 	return nil
@@ -126,36 +151,33 @@ func (s *scheduler) Register(
 	return dereg, nil
 }
 
-func (s *scheduler) Close() error {
-	// TODO: Drain first
+func (s *scheduler) Drain() {
 	close(s.stopc)
+	s.workers.Close()
+}
+
+func (s *scheduler) Close() error {
 	s.storage.Close()
 	close(s.updatec)
 	return nil
 }
 
 func (s *scheduler) process(e *pb.Event) {
-	expired := e.Job.Options.AgeLimit != -1 &&
-		time.Now().UnixNano() > e.Job.Due+e.Job.Options.AgeLimit
+	j := e.Job
+
+	expired := j.Options.AgeLimit != -1 &&
+		time.Now().UnixNano() > j.Due+j.Options.AgeLimit
 	if expired {
 		return
 	}
 
-	j := e.Job
-
-	s.mu.RLock()
-	fn, ok := s.registrations[j.Target]
-	s.mu.RUnlock()
-	if !ok {
-		// there is no handle for this target, so this job will be quietly discarded
+	fn := s.registration(j.Target)
+	if err := fn(j.Id, j.Data); err == nil {
+		// Job succeed
 		return
 	}
 
-	if err := fn(e.Job.Id, e.Job.Data); err == nil {
-		return
-	}
-
-	// Generate next attempt
+	// Job failed, prepare next attempt
 	backoff := int64(time.Second) * int64(math.Pow(2, float64(e.Attempt)))
 	if backoff < j.Options.MinBackOff {
 		backoff = j.Options.MinBackOff
@@ -184,9 +206,24 @@ func (s *scheduler) process(e *pb.Event) {
 	s.notifyUpdate(context.Background(), &next)
 }
 
+func (s *scheduler) registration(target string) func(string, []byte) error {
+	s.mu.RLock()
+	fn, ok := s.registrations[target]
+	s.mu.RUnlock()
+	if !ok {
+		return voidFn
+	}
+	return fn
+}
+
 func (s *scheduler) watchEvents() {
 	from := s.storage.LastLoad() + 1
 	for {
+		select {
+		case <-s.stopc:
+			return
+		default:
+		}
 		s.flushUpdates()
 
 		to := time.Now().UnixNano()
@@ -227,8 +264,10 @@ func (s *scheduler) watchEvents() {
 		}
 
 		// TODO: Add to heap with `to`` (upper bound)
-		for _, j := range jobs {
-			s.process(j)
+		for i := range jobs {
+			s.workers.Exec(func() {
+				s.process(jobs[i])
+			})
 		}
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
+	"github.com/stairlin/lego/crypto"
 	pb "github.com/stairlin/lego/schedule/local/localpb"
 )
 
@@ -32,11 +33,17 @@ var (
 	}
 
 	errDatabaseClosed = errors.New("db closed")
+
+	// ErrMarshalling occurs when a storage message cannot be marshalled
+	ErrMarshalling = errors.New("schedule marshalling error")
+	// ErrUnmarshalling occurs when a storage message cannot be unmarshalled
+	ErrUnmarshalling = errors.New("schedule unmarshalling error")
 )
 
 type storage struct {
-	state uint32
-	db    *bolt.DB
+	state  uint32
+	db     *bolt.DB
+	crypto *crypto.Rotor
 }
 
 func (s *storage) Open(path string) error {
@@ -75,9 +82,9 @@ func (s *storage) Save(e *pb.Event) error {
 	}
 
 	e.Id = e.Job.Id + "/" + strconv.FormatUint(uint64(e.Attempt), 10)
-	evtData, err := proto.Marshal(e)
+	evtData, err := s.Marshal(e)
 	if err != nil {
-		return errors.Wrap(err, "error marshalling event")
+		return ErrMarshalling
 	}
 
 	partKey := partitionKey(e.Due)
@@ -91,8 +98,8 @@ func (s *storage) Save(e *pb.Event) error {
 		part := pb.Partition{}
 		partData := parts.Get(partKey)
 		if len(partData) > 0 {
-			if err := proto.Unmarshal(partData, &part); err != nil {
-				return errors.Wrap(err, "error unmarshalling index")
+			if err := s.Unmarshal(partData, &part); err != nil {
+				return ErrUnmarshalling
 			}
 		}
 		if part.From == 0 && part.To == 0 {
@@ -100,9 +107,9 @@ func (s *storage) Save(e *pb.Event) error {
 		}
 		part.Keys = append(part.Keys, string(eventKey))
 		sort.Strings(part.Keys)
-		partData, err := proto.Marshal(&part)
+		partData, err := s.Marshal(&part)
 		if err != nil {
-			return errors.Wrap(err, "error marshalling index")
+			return ErrMarshalling
 		}
 
 		if err := events.Put(eventKey, evtData); err != nil {
@@ -124,6 +131,14 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 	end, _ := partitionRange(to)
 	next = end + 1
 
+	logData, err := s.Marshal(&pb.LoadLog{
+		From: from,
+		To:   to,
+	})
+	if err != nil {
+		return nil, 0, ErrMarshalling
+	}
+
 	return l, next, s.db.Batch(func(tx *bolt.Tx) error {
 		parts := tx.Bucket(partitionBucket)
 		events := tx.Bucket(eventBucket)
@@ -134,15 +149,15 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 			part := pb.Partition{}
 			partData := parts.Get(partKey)
 			if len(partData) > 0 {
-				if err := proto.Unmarshal(partData, &part); err != nil {
-					return errors.Wrap(err, "error unmarshalling index")
+				if err := s.Unmarshal(partData, &part); err != nil {
+					return ErrUnmarshalling
 				}
 			}
 
 			for _, key := range part.Keys {
 				e := pb.Event{}
-				if err := proto.Unmarshal(events.Get([]byte(key)), &e); err != nil {
-					return errors.Wrap(err, "error unmarshalling event")
+				if err := s.Unmarshal(events.Get([]byte(key)), &e); err != nil {
+					return ErrUnmarshalling
 				}
 				if from <= e.Due && e.Due <= to {
 					l = append(l, &e)
@@ -153,11 +168,9 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 			}
 		}
 
-		froms := strconv.FormatInt(from, 10)
-		tos := strconv.FormatInt(to, 10)
 		err := logs.Put(
-			[]byte(tos),
-			[]byte(froms+"-"+tos),
+			[]byte(strconv.FormatInt(to, 10)),
+			logData,
 		)
 		if err != nil {
 			return errors.Wrap(err, "error creating log record")
@@ -185,6 +198,30 @@ func (s *storage) Close() error {
 	}
 	atomic.StoreUint32(&s.state, 0)
 	return s.db.Close()
+}
+
+func (s *storage) Marshal(pb proto.Message) ([]byte, error) {
+	if s.crypto == nil {
+		return proto.Marshal(pb)
+	}
+
+	plain, err := proto.Marshal(pb)
+	if err != nil {
+		return nil, err
+	}
+	return s.crypto.Encrypt(plain)
+}
+
+func (s *storage) Unmarshal(buf []byte, pb proto.Message) error {
+	if s.crypto == nil {
+		return proto.Unmarshal(buf, pb)
+	}
+
+	plain, err := s.crypto.Decrypt(buf)
+	if err != nil {
+		return ErrUnmarshalling
+	}
+	return proto.Unmarshal(plain, pb)
 }
 
 func eventKey(e *pb.Event) []byte {

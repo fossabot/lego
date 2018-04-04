@@ -8,6 +8,12 @@ message Partition {
   repeated string keys = 3;
 }
 
+// LoadLog is a log entry for a batch load
+message LoadLog {
+  int64 from = 1;
+  int64 to = 2;
+}
+
 // A Job is a one-time task definition
 message Job {
 	string id = 1;

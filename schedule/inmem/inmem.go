@@ -89,6 +89,10 @@ func (s *scheduler) Register(
 	return dereg, nil
 }
 
+func (s *scheduler) Drain() {
+	// TODO: Wait for all jobs to complete (and stop accepting new ones)
+}
+
 func (s *scheduler) Close() error {
 	s.stop <- struct{}{}
 	return nil

@@ -42,7 +42,13 @@ type Scheduler interface {
 	// It should create a Schedule struct that will generate Jobs (occurrences)
 	// Interval(r RRule, target string, o ...JobOption) error
 
-	// Close shuts down the scheduler.
+	// Drain finishes the ongoing job batch and stops after that.
+	// When a scheduler is drained, it should still be possible to register new
+	// jobs, but none of them will be executed until the scheduler restart.
+	// Once a scheduler is drained, it can safely be closed.
+	Drain()
+	// Close immediately closes the scheduler and any ongoing job will be left unfinished.
+	// For a graceful shutdown, use Drain first and then Close.
 	Close() error
 }
 
