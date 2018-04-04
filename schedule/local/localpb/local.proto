@@ -11,8 +11,9 @@ message Partition {
 // Checkpoint stores a time range. It is used to store the last load performed
 // as a checkpoint to resume processing where it was left off.
 message Checkpoint {
-  int64 from = 1;
-  int64 to = 2;
+  uint64 seq = 1;
+  int64 from = 2;
+  int64 to = 3;
 }
 
 // A Job is a one-time task definition

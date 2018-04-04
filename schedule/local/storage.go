@@ -132,14 +132,6 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 	end, _ := partitionRange(to)
 	next = end + 1
 
-	checkpointData, err := s.Marshal(&pb.Checkpoint{
-		From: from,
-		To:   to,
-	})
-	if err != nil {
-		return nil, 0, ErrMarshalling
-	}
-
 	return l, next, s.db.Batch(func(tx *bolt.Tx) error {
 		parts := tx.Bucket(partitionBucket)
 		events := tx.Bucket(eventBucket)
@@ -169,11 +161,19 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 			}
 		}
 
-		err := checkpoints.Put(
-			lastCheckpointKey,
-			checkpointData,
-		)
+		seq, err := checkpoints.NextSequence()
 		if err != nil {
+			return err
+		}
+		checkpointData, err := s.Marshal(&pb.Checkpoint{
+			Seq:  seq,
+			From: from,
+			To:   to,
+		})
+		if err != nil {
+			return ErrMarshalling
+		}
+		if err := checkpoints.Put(lastCheckpointKey, checkpointData); err != nil {
 			return errors.Wrap(err, "error creating log record")
 		}
 		return nil
@@ -196,7 +196,9 @@ func (s *storage) LastCheckpoint() (t int64) {
 		if err := s.Unmarshal(data, &cp); err != nil {
 			return err
 		}
-		t = cp.To
+		if cp.Seq == checkpoints.Sequence() {
+			t = cp.To
+		}
 		return nil
 	})
 	return t
