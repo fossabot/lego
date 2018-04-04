@@ -217,7 +217,7 @@ func (s *scheduler) registration(target string) func(string, []byte) error {
 }
 
 func (s *scheduler) watchEvents() {
-	from := s.storage.LastLoad() + 1
+	from := s.storage.LastCheckpoint() + 1
 	for {
 		select {
 		case <-s.stopc:

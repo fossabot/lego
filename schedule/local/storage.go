@@ -22,22 +22,23 @@ const (
 )
 
 var (
-	eventBucket     = []byte("event")
-	partitionBucket = []byte("partition")
-	logBucket       = []byte("log")
-
-	bucketKeys = [][]byte{
-		eventBucket,
-		partitionBucket,
-		logBucket,
-	}
-
-	errDatabaseClosed = errors.New("db closed")
-
 	// ErrMarshalling occurs when a storage message cannot be marshalled
 	ErrMarshalling = errors.New("schedule marshalling error")
 	// ErrUnmarshalling occurs when a storage message cannot be unmarshalled
 	ErrUnmarshalling = errors.New("schedule unmarshalling error")
+
+	eventBucket       = []byte("event")
+	partitionBucket   = []byte("partition")
+	checkpointBuckets = []byte("checkpoint")
+	bucketKeys        = [][]byte{
+		eventBucket,
+		partitionBucket,
+		checkpointBuckets,
+	}
+
+	lastCheckpointKey = []byte("last")
+
+	errDatabaseClosed = errors.New("db closed")
 )
 
 type storage struct {
@@ -131,7 +132,7 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 	end, _ := partitionRange(to)
 	next = end + 1
 
-	logData, err := s.Marshal(&pb.LoadLog{
+	checkpointData, err := s.Marshal(&pb.Checkpoint{
 		From: from,
 		To:   to,
 	})
@@ -142,7 +143,7 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 	return l, next, s.db.Batch(func(tx *bolt.Tx) error {
 		parts := tx.Bucket(partitionBucket)
 		events := tx.Bucket(eventBucket)
-		logs := tx.Bucket(logBucket)
+		checkpoints := tx.Bucket(checkpointBuckets)
 
 		for t := start; t <= end; t += partitionBy {
 			partKey := partitionKey(t)
@@ -168,9 +169,9 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 			}
 		}
 
-		err := logs.Put(
-			[]byte(strconv.FormatInt(to, 10)),
-			logData,
+		err := checkpoints.Put(
+			lastCheckpointKey,
+			checkpointData,
 		)
 		if err != nil {
 			return errors.Wrap(err, "error creating log record")
@@ -179,14 +180,23 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 	})
 }
 
-func (s *storage) LastLoad() (t int64) {
-	s.db.Batch(func(tx *bolt.Tx) error {
-		logs := tx.Bucket(logBucket)
+func (s *storage) LastCheckpoint() (t int64) {
+	// Just to make sure previous job won't be processed twice
+	t = time.Now().UnixNano()
 
-		k, _ := logs.Cursor().Last()
-		if len(k) > 0 {
-			t, _ = strconv.ParseInt(string(k), 10, 64)
+	s.db.Batch(func(tx *bolt.Tx) error {
+		checkpoints := tx.Bucket(checkpointBuckets)
+
+		data := checkpoints.Get(lastCheckpointKey)
+		if len(data) == 0 {
+			return nil
 		}
+
+		cp := pb.Checkpoint{}
+		if err := s.Unmarshal(data, &cp); err != nil {
+			return err
+		}
+		t = cp.To
 		return nil
 	})
 	return t
