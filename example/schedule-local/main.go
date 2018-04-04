@@ -49,19 +49,26 @@ func start(app *lego.App) error {
 	if err := scheduler.Start(); err != nil {
 		return err
 	}
-	scheduler.Register("foo", func(id string, data []byte) error {
+	scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		app.Ctx().Trace("schedule.process", "Process job",
 			log.String("job_id", id),
 			log.String("job_data", string(data)),
 		)
 		return nil
 	})
-	scheduler.Register("err", func(id string, data []byte) error {
+	scheduler.HandleFunc("err", func(id string, data []byte) error {
 		app.Ctx().Trace("schedule.process", "Process job",
 			log.String("job_id", id),
 			log.String("job_data", string(data)),
 		)
 		return errors.New("job failed")
+	})
+	scheduler.HandleFunc("panic", func(id string, data []byte) error {
+		app.Ctx().Trace("schedule.process", "Process job",
+			log.String("job_id", id),
+			log.String("job_data", string(data)),
+		)
+		panic("BOOM!")
 	})
 	app.Ctx().SetSchedule(scheduler)
 

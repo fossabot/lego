@@ -43,13 +43,13 @@ func TestInMem_ScheduleJob(t *testing.T) {
 	}
 }
 
-func TestInMem_Register(t *testing.T) {
+func TestInMem_HandleFunc(t *testing.T) {
 	scheduler := inmem.NewScheduler()
 	if err := scheduler.Start(); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 
-	dereg, err := scheduler.Register("foo", func(id string, data []byte) error {
+	dereg, err := scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -58,7 +58,7 @@ func TestInMem_Register(t *testing.T) {
 	}
 
 	// Attempt to register a duplicate
-	_, err = scheduler.Register("foo", func(id string, data []byte) error {
+	_, err = scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -70,7 +70,7 @@ func TestInMem_Register(t *testing.T) {
 	dereg()
 
 	// Attempt to register Again
-	_, err = scheduler.Register("foo", func(id string, data []byte) error {
+	_, err = scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -94,7 +94,7 @@ func TestInMem_DequeueValidJobs(t *testing.T) {
 	expect := []byte("data dawg")
 	var callbackCount uint32
 
-	dereg, err := scheduler.Register("foo", func(id string, data []byte) error {
+	dereg, err := scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		atomic.AddUint32(&callbackCount, 1)
 		if id == "" {
 			t.Error("expect id to not be empty")
@@ -151,7 +151,7 @@ func TestInMem_LeaveFutureJobs(t *testing.T) {
 		t.Fatal("cannot start scheduler", err)
 	}
 
-	dereg, err := scheduler.Register("foo", func(id string, data []byte) error {
+	dereg, err := scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})

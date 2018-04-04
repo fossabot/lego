@@ -15,10 +15,7 @@ import (
 	pb "github.com/stairlin/lego/schedule/local/localpb"
 )
 
-// TODO:
-// - Heap (unit of work)
-// - Encrypt data
-// - Reap jobs (keep window of 1 week for debugging purpose)
+// TODO: Cleanup old events (Add window to config - e.g. keep 1 week for debugging purpose)
 
 const (
 	defaultDB           = "schedule.local.db"
@@ -34,10 +31,10 @@ var (
 type scheduler struct {
 	mu sync.RWMutex
 
-	config        Config
-	registrations map[string]func(string, []byte) error
-	storage       *storage
-	workers       *pool
+	config    Config
+	handlers  map[string]func(string, []byte) error
+	storage   *storage
+	processor *processor
 
 	updatec chan *pb.Event
 	stopc   chan struct{}
@@ -49,13 +46,17 @@ type Config struct {
 	DB string
 	// Workers is the maximum number of goroutines that process jobs in parallel
 	Workers int
-	// Encryption activates data encryption
+	// Encryption activates data encryption.
+	// It is worth noting that once a database created, it is no longer possible
+	// to change this option.
 	Encryption *EncryptionConfig
 }
 
-// EncryptionConfig is the configuration to encrypt data stored
+// EncryptionConfig is the configuration to encrypt data stored.
+// The database encryption supports key rotation, so new keys can be added without
+// affecting existing data. Old keys should be kept (almost) forever.
 type EncryptionConfig struct {
-	// Default is the default key ID to use
+	// Default is the key to use to encrypt new data
 	Default uint32
 	// Keys contains all encryption keys available
 	Keys map[uint32][]byte
@@ -72,25 +73,29 @@ func NewScheduler(c Config) schedule.Scheduler {
 		c.Workers = defaultWorkers
 	}
 	return &scheduler{
-		config:        c,
-		registrations: make(map[string]func(string, []byte) error),
+		config:   c,
+		handlers: make(map[string]func(string, []byte) error),
 	}
 }
 
-// Open opens the storage
 func (s *scheduler) Start() error {
 	s.updatec = make(chan *pb.Event, defaultUpdateBuffer)
 	s.stopc = make(chan struct{})
-
+	s.processor = &processor{
+		n:       s.config.Workers,
+		bucketc: make(chan *pb.Event),
+		process: s.process,
+	}
 	s.storage = &storage{}
 	if s.config.Encryption != nil {
 		enc := s.config.Encryption
 		s.storage.crypto = crypto.NewRotor(enc.Keys, enc.Default)
 	}
+
 	if err := s.storage.Open(s.config.DB); err != nil {
 		return err
 	}
-	s.workers = newPool(s.config.Workers)
+	s.processor.Start()
 
 	go s.watchEvents()
 	return nil
@@ -134,26 +139,26 @@ func (s *scheduler) In(
 	return s.At(ctx, time.Now().Add(d), target, data, o...)
 }
 
-func (s *scheduler) Register(
+func (s *scheduler) HandleFunc(
 	target string, fn func(string, []byte) error,
 ) (deregister func(), err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.registrations[target]; ok {
+	if _, ok := s.handlers[target]; ok {
 		return nil, errors.New("duplicate registration for target " + target)
 	}
 
-	s.registrations[target] = fn
+	s.handlers[target] = fn
 	dereg := func() {
-		delete(s.registrations, target)
+		delete(s.handlers, target)
 	}
 	return dereg, nil
 }
 
 func (s *scheduler) Drain() {
 	close(s.stopc)
-	s.workers.Close()
+	s.processor.Close()
 }
 
 func (s *scheduler) Close() error {
@@ -171,7 +176,7 @@ func (s *scheduler) process(e *pb.Event) {
 		return
 	}
 
-	fn := s.registration(j.Target)
+	fn := s.handler(j.Target)
 	if err := fn(j.Id, j.Data); err == nil {
 		// Job succeed
 		return
@@ -206,9 +211,9 @@ func (s *scheduler) process(e *pb.Event) {
 	s.notifyUpdate(context.Background(), &next)
 }
 
-func (s *scheduler) registration(target string) func(string, []byte) error {
+func (s *scheduler) handler(target string) func(string, []byte) error {
 	s.mu.RLock()
-	fn, ok := s.registrations[target]
+	fn, ok := s.handlers[target]
 	s.mu.RUnlock()
 	if !ok {
 		return voidFn
@@ -263,11 +268,8 @@ func (s *scheduler) watchEvents() {
 			}
 		}
 
-		// TODO: Add to heap with `to`` (upper bound)
 		for i := range jobs {
-			s.workers.Exec(func() {
-				s.process(jobs[i])
-			})
+			s.processor.Exec(jobs[i])
 		}
 	}
 }

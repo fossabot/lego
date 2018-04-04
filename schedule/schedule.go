@@ -25,22 +25,21 @@ type Scheduler interface {
 	// this function may start the event loop and watch the updates.
 	Start() error
 
+	// HandleFunc registers fn for the given target. For each new job, fn will be called.
+	// There can be only one handler per target.
+	HandleFunc(target string, fn func(id string, data []byte) error) (deregister func(), err error)
+
 	// At registers a job that will be executed at time t
 	At(ctx context.Context, t time.Time, target string, data []byte, o ...JobOption) (string, error)
 	// In registers a job that will be executed in duration d from now
 	In(ctx context.Context, d time.Duration, target string, data []byte, o ...JobOption) (string, error)
-	// Cancel cancels a scheduled job.
-	// When an id does not exist or is from an already-executed job, Cancel will ignore
-	// the operation
-	// Cancel(id string)
-	// Register to all events from the given target. For each new job, fn will be
-	// called.
-	// There can be only one registration per target.
-	Register(target string, fn func(id string, data []byte) error) (deregister func(), err error)
 
 	// TODO: Interval API
-	// It should create a Schedule struct that will generate Jobs (occurrences)
-	// Interval(r RRule, target string, o ...JobOption) error
+	// It should create a Schedule struct that will generate Jobs.
+	// When a job is being executed, it should generates the next occurence based on the interval rule.
+	//
+	// Interval schedules one to multiple jobs based on the given interval rules.
+	// Interval(ctx context.Context, r RRule, target string, data []byte, o ...JobOption) error
 
 	// Drain finishes the ongoing job batch and stops after that.
 	// When a scheduler is drained, it should still be possible to register new

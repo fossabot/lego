@@ -70,7 +70,7 @@ func (s *scheduler) In(
 	return s.At(ctx, time.Now().Add(d), target, data, o...)
 }
 
-func (s *scheduler) Register(
+func (s *scheduler) HandleFunc(
 	target string, fn func(string, []byte) error,
 ) (deregister func(), err error) {
 	s.mu.Lock()

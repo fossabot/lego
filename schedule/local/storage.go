@@ -14,8 +14,6 @@ import (
 	pb "github.com/stairlin/lego/schedule/local/localpb"
 )
 
-// TODO: Implement encryption
-
 const (
 	dbFileMod   = 0600
 	partitionBy = int64(time.Hour)
@@ -47,6 +45,7 @@ type storage struct {
 	crypto *crypto.Rotor
 }
 
+// Open opens the database. This function must be called first.
 func (s *storage) Open(path string) error {
 	db, err := bolt.Open(
 		path,
@@ -76,14 +75,14 @@ func (s *storage) Open(path string) error {
 	return nil
 }
 
-// Save persists j to the local database and update the index
+// Save persists e to the storage
 func (s *storage) Save(e *pb.Event) error {
 	if atomic.LoadUint32(&s.state) == 0 {
 		return errDatabaseClosed
 	}
 
 	e.Id = e.Job.Id + "/" + strconv.FormatUint(uint64(e.Attempt), 10)
-	evtData, err := s.Marshal(e)
+	evtData, err := s.marshal(e)
 	if err != nil {
 		return ErrMarshalling
 	}
@@ -99,7 +98,7 @@ func (s *storage) Save(e *pb.Event) error {
 		part := pb.Partition{}
 		partData := parts.Get(partKey)
 		if len(partData) > 0 {
-			if err := s.Unmarshal(partData, &part); err != nil {
+			if err := s.unmarshal(partData, &part); err != nil {
 				return ErrUnmarshalling
 			}
 		}
@@ -108,7 +107,7 @@ func (s *storage) Save(e *pb.Event) error {
 		}
 		part.Keys = append(part.Keys, string(eventKey))
 		sort.Strings(part.Keys)
-		partData, err := s.Marshal(&part)
+		partData, err := s.marshal(&part)
 		if err != nil {
 			return ErrMarshalling
 		}
@@ -123,6 +122,8 @@ func (s *storage) Save(e *pb.Event) error {
 	})
 }
 
+// Load loads events due within the given range and return the time on which
+// the next event is due.
 func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 	if atomic.LoadUint32(&s.state) == 0 {
 		return nil, 0, errDatabaseClosed
@@ -142,14 +143,14 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 			part := pb.Partition{}
 			partData := parts.Get(partKey)
 			if len(partData) > 0 {
-				if err := s.Unmarshal(partData, &part); err != nil {
+				if err := s.unmarshal(partData, &part); err != nil {
 					return ErrUnmarshalling
 				}
 			}
 
 			for _, key := range part.Keys {
 				e := pb.Event{}
-				if err := s.Unmarshal(events.Get([]byte(key)), &e); err != nil {
+				if err := s.unmarshal(events.Get([]byte(key)), &e); err != nil {
 					return ErrUnmarshalling
 				}
 				if from <= e.Due && e.Due <= to {
@@ -165,7 +166,7 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 		if err != nil {
 			return err
 		}
-		checkpointData, err := s.Marshal(&pb.Checkpoint{
+		checkpointData, err := s.marshal(&pb.Checkpoint{
 			Seq:  seq,
 			From: from,
 			To:   to,
@@ -180,8 +181,9 @@ func (s *storage) Load(from, to int64) (l []*pb.Event, next int64, err error) {
 	})
 }
 
+// LastCheckpoint returns the upper bound of the last load range.
 func (s *storage) LastCheckpoint() (t int64) {
-	// Just to make sure previous job won't be processed twice
+	// Default value to make sure old events won't be re-processed
 	t = time.Now().UnixNano()
 
 	s.db.Batch(func(tx *bolt.Tx) error {
@@ -193,7 +195,7 @@ func (s *storage) LastCheckpoint() (t int64) {
 		}
 
 		cp := pb.Checkpoint{}
-		if err := s.Unmarshal(data, &cp); err != nil {
+		if err := s.unmarshal(data, &cp); err != nil {
 			return err
 		}
 		if cp.Seq == checkpoints.Sequence() {
@@ -204,6 +206,7 @@ func (s *storage) LastCheckpoint() (t int64) {
 	return t
 }
 
+// Close implements io.Closer
 func (s *storage) Close() error {
 	if s.db == nil {
 		return nil
@@ -212,7 +215,7 @@ func (s *storage) Close() error {
 	return s.db.Close()
 }
 
-func (s *storage) Marshal(pb proto.Message) ([]byte, error) {
+func (s *storage) marshal(pb proto.Message) ([]byte, error) {
 	if s.crypto == nil {
 		return proto.Marshal(pb)
 	}
@@ -224,7 +227,7 @@ func (s *storage) Marshal(pb proto.Message) ([]byte, error) {
 	return s.crypto.Encrypt(plain)
 }
 
-func (s *storage) Unmarshal(buf []byte, pb proto.Message) error {
+func (s *storage) unmarshal(buf []byte, pb proto.Message) error {
 	if s.crypto == nil {
 		return proto.Unmarshal(buf, pb)
 	}

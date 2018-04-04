@@ -81,7 +81,7 @@ func Test_In(t *testing.T) {
 	}
 }
 
-func Test_Register(t *testing.T) {
+func Test_HandleFunc(t *testing.T) {
 	t.Parallel()
 
 	c := local.Config{
@@ -94,7 +94,7 @@ func Test_Register(t *testing.T) {
 		t.Fatal("cannot start scheduler", err)
 	}
 
-	dereg, err := scheduler.Register("foo", func(id string, data []byte) error {
+	dereg, err := scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -103,7 +103,7 @@ func Test_Register(t *testing.T) {
 	}
 
 	// Attempt to register a duplicate
-	_, err = scheduler.Register("foo", func(id string, data []byte) error {
+	_, err = scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -115,7 +115,7 @@ func Test_Register(t *testing.T) {
 	dereg()
 
 	// Attempt to register Again
-	_, err = scheduler.Register("foo", func(id string, data []byte) error {
+	_, err = scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -146,7 +146,7 @@ func Test_DequeueValidJobs(t *testing.T) {
 	expect := []byte("data dawg")
 	var callbackCount uint32
 
-	dereg, err := scheduler.Register("foo", func(id string, data []byte) error {
+	dereg, err := scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		atomic.AddUint32(&callbackCount, 1)
 		if id == "" {
 			t.Error("expect id to not be empty")
@@ -211,7 +211,7 @@ func Test_LeaveFutureJobs(t *testing.T) {
 		t.Fatal("cannot start scheduler", err)
 	}
 
-	dereg, err := scheduler.Register("foo", func(id string, data []byte) error {
+	dereg, err := scheduler.HandleFunc("foo", func(id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -257,7 +257,7 @@ func TestStorage_Encryption(t *testing.T) {
 	expect := []byte("data dawg")
 	var callbackCount uint32
 
-	dereg, err := sh.Register("foo", func(id string, data []byte) error {
+	dereg, err := sh.HandleFunc("foo", func(id string, data []byte) error {
 		atomic.AddUint32(&callbackCount, 1)
 		if id == "" {
 			t.Error("expect id to not be empty")
