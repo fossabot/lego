@@ -7,7 +7,6 @@ import (
 
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/schedule"
-	"github.com/stairlin/lego/schedule/adapter/inmem"
 	"github.com/stairlin/lego/schedule/adapter/local"
 )
 
@@ -21,7 +20,6 @@ var (
 
 func init() {
 	// Register default adapters
-	Register(inmem.Name, inmem.New)
 	Register(local.Name, local.New)
 }
 
