@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/stairlin/lego/schedule/local/localpb"
+	pb "github.com/stairlin/lego/schedule/adapter/local/localpb"
 )
 
 type watcher struct {

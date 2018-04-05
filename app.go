@@ -14,11 +14,13 @@ import (
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/disco"
-	da "github.com/stairlin/lego/disco/adapter"
+	discoA "github.com/stairlin/lego/disco/adapter"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/log/logger"
 	"github.com/stairlin/lego/net"
-	sa "github.com/stairlin/lego/stats/adapter"
+	"github.com/stairlin/lego/schedule"
+	scheduleA "github.com/stairlin/lego/schedule/adapter"
+	statsA "github.com/stairlin/lego/stats/adapter"
 )
 
 const (
@@ -36,6 +38,7 @@ type App struct {
 	ctx           app.Ctx
 	config        *config.Config
 	disco         disco.Agent
+	scheduler     schedule.Scheduler
 	servers       *net.Reg
 	registrations []*disco.Registration
 
@@ -70,20 +73,26 @@ func NewWithConfig(service string, c *config.Config) (*App, error) {
 	// Create logger
 	l, err := logger.New(service, &c.Log)
 	if err != nil {
-		return nil, fmt.Errorf("logger error: %s", err)
+		return nil, errors.Wrap(err, "error initialising logger")
 	}
 
 	// Build stats
-	s, err := sa.New(&c.Stats)
+	s, err := statsA.New(&c.Stats)
 	if err != nil {
-		return nil, fmt.Errorf("stats error: %s", err)
+		return nil, errors.Wrap(err, "error initialising stats")
 	}
 	s.SetLogger(l)
 
-	// Service discovery
-	sd, err := da.New(c)
+	// Build service discovery
+	sd, err := discoA.New(c)
 	if err != nil {
-		return nil, fmt.Errorf("disco error: %s", err)
+		return nil, errors.Wrap(err, "error initialising disco")
+	}
+
+	// Build scheduler
+	sh, err := scheduleA.New(c)
+	if err != nil {
+		return nil, errors.Wrap(err, "error initialising scheduler")
 	}
 
 	// Build app context
@@ -96,13 +105,14 @@ func NewWithConfig(service string, c *config.Config) (*App, error) {
 
 	// Build app struct
 	app := &App{
-		service: service,
-		ready:   ready,
-		ctx:     ctx,
-		config:  c,
-		disco:   sd,
-		servers: net.NewReg(ctx),
-		done:    make(chan bool, 1),
+		service:   service,
+		ready:     ready,
+		ctx:       ctx,
+		config:    c,
+		disco:     sd,
+		scheduler: sh,
+		servers:   net.NewReg(ctx),
+		done:      make(chan bool, 1),
 	}
 
 	// Start background services
@@ -112,12 +122,21 @@ func NewWithConfig(service string, c *config.Config) (*App, error) {
 	// Trap OS signals
 	go trapSignals(app)
 
+	// Start Scheduler
+	if err := sh.Start(ctx); err != nil {
+		return nil, errors.Wrap(err, "error starting scheduler")
+	}
+
 	return app, nil
 }
 
 // Config returns the lego config
 func (a *App) Config() *config.Config {
 	return a.config
+}
+
+func (a *App) Scheduler() schedule.Scheduler {
+	return a.scheduler
 }
 
 // Serve allows handlers to serve requests and blocks the call
@@ -214,7 +233,7 @@ func (a *App) Close() error {
 }
 
 func (a *App) close() {
-	a.ctx.Schedule().Close()
+	a.scheduler.Close()
 	a.ctx.Cancel()
 
 	a.done <- true

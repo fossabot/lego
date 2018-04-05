@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/ctx/journey"
 )
 
 const (
@@ -23,11 +25,11 @@ const (
 type Scheduler interface {
 	// Start does the initialisation work to bootstrap a Scheduler. For example,
 	// this function may start the event loop and watch the updates.
-	Start() error
+	Start(ctx app.Ctx) error
 
 	// HandleFunc registers fn for the given target. For each new job, fn will be called.
 	// There can be only one handler per target.
-	HandleFunc(target string, fn func(id string, data []byte) error) (deregister func(), err error)
+	HandleFunc(target string, fn Fn) (deregister func(), err error)
 
 	// At registers a job that will be executed at time t
 	At(ctx context.Context, t time.Time, target string, data []byte, o ...JobOption) (string, error)
@@ -50,6 +52,11 @@ type Scheduler interface {
 	// For a graceful shutdown, use Drain first and then Close.
 	Close() error
 }
+
+// Fn is a job handler that is called for each job process.
+// When an error is returned, a new occurence will be re-scheduled based on the
+// JobOption rules.
+type Fn func(ctx journey.Ctx, id string, data []byte) error
 
 // A Job is a one-time task executed at a specific time.
 type Job struct {

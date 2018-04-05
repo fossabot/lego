@@ -6,13 +6,14 @@ import (
 
 // Config defines the app config
 type Config struct {
-	Node    string      `json:"node"`
-	Version string      `json:"version"`
-	Disco   Disco       `json:"disco"`
-	Request Request     `json:"request"`
-	Log     Log         `json:"log"`
-	Stats   Stats       `json:"stats"`
-	App     interface{} `json:"app"`
+	Node      string      `json:"node"`
+	Version   string      `json:"version"`
+	Disco     Disco       `json:"disco"`
+	Scheduler Scheduler   `json:"scheduler"`
+	Request   Request     `json:"request"`
+	Log       Log         `json:"log"`
+	Stats     Stats       `json:"stats"`
+	App       interface{} `json:"app"`
 }
 
 // Disco contains the configuration to start a service discovery agent
@@ -22,6 +23,13 @@ type Disco struct {
 	DefaultTags   []string          `json:"default_tags"`
 	Adapter       string            `json:"adapter"`
 	Config        map[string]string `json:"config"`
+}
+
+// Scheduler contains the configuration to start a job scheduler
+type Scheduler struct {
+	On      bool              `json:"on"`
+	Adapter string            `json:"adapter"`
+	Config  map[string]string `json:"config"`
 }
 
 // Log contains all log-related configuration

@@ -1,17 +1,21 @@
 package inmem_test
 
 import (
-	"context"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/stairlin/lego/schedule/inmem"
+	"github.com/stairlin/lego/ctx/journey"
+	"github.com/stairlin/lego/schedule/adapter/inmem"
+	lt "github.com/stairlin/lego/testing"
 )
 
 func TestInMem_Init(t *testing.T) {
-	scheduler := inmem.NewScheduler()
-	if err := scheduler.Start(); err != nil {
+	tt := lt.New(t)
+	ctx := tt.NewAppCtx(t.Name())
+
+	scheduler := inmem.New(ctx.Config())
+	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 
@@ -21,13 +25,16 @@ func TestInMem_Init(t *testing.T) {
 }
 
 func TestInMem_ScheduleJob(t *testing.T) {
-	scheduler := inmem.NewScheduler()
-	if err := scheduler.Start(); err != nil {
+	tt := lt.New(t)
+	ctx := tt.NewAppCtx(t.Name())
+
+	scheduler := inmem.New(ctx.Config())
+	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 
 	for i := 0; i < 20; i++ {
-		id, err := scheduler.In(context.TODO(), time.Millisecond, "foo", nil)
+		id, err := scheduler.In(ctx, time.Millisecond, "foo", nil)
 		if err != nil {
 			t.Fatal("cannot schedule new job", err)
 		}
@@ -44,12 +51,15 @@ func TestInMem_ScheduleJob(t *testing.T) {
 }
 
 func TestInMem_HandleFunc(t *testing.T) {
-	scheduler := inmem.NewScheduler()
-	if err := scheduler.Start(); err != nil {
+	tt := lt.New(t)
+	ctx := tt.NewAppCtx(t.Name())
+
+	scheduler := inmem.New(ctx.Config())
+	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 
-	dereg, err := scheduler.HandleFunc("foo", func(id string, data []byte) error {
+	dereg, err := scheduler.HandleFunc("foo", func(ctx journey.Ctx, id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -58,7 +68,7 @@ func TestInMem_HandleFunc(t *testing.T) {
 	}
 
 	// Attempt to register a duplicate
-	_, err = scheduler.HandleFunc("foo", func(id string, data []byte) error {
+	_, err = scheduler.HandleFunc("foo", func(ctx journey.Ctx, id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -70,7 +80,7 @@ func TestInMem_HandleFunc(t *testing.T) {
 	dereg()
 
 	// Attempt to register Again
-	_, err = scheduler.HandleFunc("foo", func(id string, data []byte) error {
+	_, err = scheduler.HandleFunc("foo", func(ctx journey.Ctx, id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -86,15 +96,18 @@ func TestInMem_HandleFunc(t *testing.T) {
 // TestInMem_DequeueValidJobs ensures that only scheduled now or in the past
 // are being executed
 func TestInMem_DequeueValidJobs(t *testing.T) {
-	scheduler := inmem.NewScheduler()
-	if err := scheduler.Start(); err != nil {
+	tt := lt.New(t)
+	ctx := tt.NewAppCtx(t.Name())
+
+	scheduler := inmem.New(ctx.Config())
+	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 
 	expect := []byte("data dawg")
 	var callbackCount uint32
 
-	dereg, err := scheduler.HandleFunc("foo", func(id string, data []byte) error {
+	dereg, err := scheduler.HandleFunc("foo", func(ctx journey.Ctx, id string, data []byte) error {
 		atomic.AddUint32(&callbackCount, 1)
 		if id == "" {
 			t.Error("expect id to not be empty")
@@ -109,28 +122,28 @@ func TestInMem_DequeueValidJobs(t *testing.T) {
 	}
 	defer dereg()
 
-	if _, err := scheduler.At(context.TODO(), time.Now(), "foo", expect); err != nil {
+	if _, err := scheduler.At(ctx, time.Now(), "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.At(context.TODO(), time.Now(), "foo", expect); err != nil {
+	if _, err := scheduler.At(ctx, time.Now(), "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(context.TODO(), time.Second, "foo", expect); err != nil {
+	if _, err := scheduler.In(ctx, time.Second, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(context.TODO(), time.Second*2, "foo", expect); err != nil {
+	if _, err := scheduler.In(ctx, time.Second*2, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(context.TODO(), time.Second*4, "foo", expect); err != nil {
+	if _, err := scheduler.In(ctx, time.Second*4, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(context.TODO(), time.Second*8, "foo", expect); err != nil {
+	if _, err := scheduler.In(ctx, time.Second*8, "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 
 	time.Sleep(time.Millisecond * 10)
 
-	if _, err := scheduler.At(context.TODO(), time.Now(), "foo", expect); err != nil {
+	if _, err := scheduler.At(ctx, time.Now(), "foo", expect); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 
@@ -146,12 +159,15 @@ func TestInMem_DequeueValidJobs(t *testing.T) {
 
 // TestInMem_LeaveFutureJobs ensures that future jobs are not executed
 func TestInMem_LeaveFutureJobs(t *testing.T) {
-	scheduler := inmem.NewScheduler()
-	if err := scheduler.Start(); err != nil {
+	tt := lt.New(t)
+	ctx := tt.NewAppCtx(t.Name())
+
+	scheduler := inmem.New(ctx.Config())
+	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
 
-	dereg, err := scheduler.HandleFunc("foo", func(id string, data []byte) error {
+	dereg, err := scheduler.HandleFunc("foo", func(ctx journey.Ctx, id string, data []byte) error {
 		t.Error("unexpected callback")
 		return nil
 	})
@@ -160,13 +176,13 @@ func TestInMem_LeaveFutureJobs(t *testing.T) {
 	}
 	defer dereg()
 
-	if _, err := scheduler.In(context.TODO(), time.Second*30, "foo", nil); err != nil {
+	if _, err := scheduler.In(ctx, time.Second*30, "foo", nil); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(context.TODO(), time.Second*60, "foo", nil); err != nil {
+	if _, err := scheduler.In(ctx, time.Second*60, "foo", nil); err != nil {
 		t.Fatal("cannot schedule job")
 	}
-	if _, err := scheduler.In(context.TODO(), time.Second*120, "foo", nil); err != nil {
+	if _, err := scheduler.In(ctx, time.Second*120, "foo", nil); err != nil {
 		t.Fatal("cannot schedule job")
 	}
 

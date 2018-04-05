@@ -9,23 +9,30 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stairlin/lego/config"
+	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/schedule"
 )
+
+// Name contains the adapter registered name
+const Name = "inmem"
 
 type scheduler struct {
 	mu sync.RWMutex
 
+	ctx           app.Ctx
 	q             jobQueue
-	registrations map[string]func(string, []byte) error
+	registrations map[string]schedule.Fn
 	stop          chan struct{}
 	update        chan struct{}
 }
 
-// NewScheduler creates a new in-memory scheduler.
+// New creates a new in-memory scheduler.
 // It should only be used for testing purpose. JOBS ARE NOT PERSISTED.
-func NewScheduler() schedule.Scheduler {
+func New(c *config.Config) schedule.Scheduler {
 	s := &scheduler{
-		registrations: make(map[string]func(string, []byte) error),
+		registrations: make(map[string]schedule.Fn),
 		stop:          make(chan struct{}),
 		update:        make(chan struct{}, 1),
 	}
@@ -33,7 +40,8 @@ func NewScheduler() schedule.Scheduler {
 	return s
 }
 
-func (s *scheduler) Start() error {
+func (s *scheduler) Start(ctx app.Ctx) error {
+	s.ctx = ctx
 	go s.dequeueEvents()
 	return nil
 }
@@ -71,7 +79,7 @@ func (s *scheduler) In(
 }
 
 func (s *scheduler) HandleFunc(
-	target string, fn func(string, []byte) error,
+	target string, fn schedule.Fn,
 ) (deregister func(), err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -108,7 +116,8 @@ func (s *scheduler) execute(i *event) {
 	}
 
 	j := i.Job
-	if err := fn(j.ID, j.Data); err == nil {
+	ctx := journey.New(s.ctx)
+	if err := fn(ctx, j.ID, j.Data); err == nil {
 		return
 	}
 

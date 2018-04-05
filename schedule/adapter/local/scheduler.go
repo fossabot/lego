@@ -1,20 +1,28 @@
-// Package local implements a scheduler that persists jobs on a local storage.
-// The implementation currently uses BoltDB (https://github.com/boltdb/bolt).
 package local
 
 import (
 	"context"
 	"math"
 	"math/rand"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/stairlin/lego/config"
+	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/schedule"
-	pb "github.com/stairlin/lego/schedule/local/localpb"
+	pb "github.com/stairlin/lego/schedule/adapter/local/localpb"
 )
 
 // TODO: Cleanup old events (Add window to config - e.g. keep 1 week for debugging purpose)
+// TODO: Implement two checkpoints (pulled & processed). If the server crashes before
+// pulled events are processed, they should be processed again (based on the Consistency level)
+
+// Name contains the adapter registered name
+const Name = "local"
 
 const (
 	defaultDB           = "schedule.local.db"
@@ -24,14 +32,15 @@ const (
 
 var (
 	seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
-	voidFn     = func(string, []byte) error { return nil }
+	voidFn     = func(journey.Ctx, string, []byte) error { return nil }
 )
 
 type scheduler struct {
 	mu sync.RWMutex
 
+	ctx      app.Ctx
 	config   Config
-	handlers map[string]func(string, []byte) error
+	handlers map[string]schedule.Fn
 
 	// storage takes care of job/event/index persistence
 	storage *storage
@@ -63,10 +72,31 @@ type EncryptionConfig struct {
 	Keys map[uint32][]byte
 }
 
-// NewScheduler creates a scheduler that persists data locally.
+// New creates a scheduler that persists data locally.
 // This scheduler cannot be used on a distributed setup. Use net/schedule when
 // running multiple lego instances.
-func NewScheduler(c Config) schedule.Scheduler {
+func New(conf *config.Config) schedule.Scheduler {
+	c := Config{
+		DB:      conf.Scheduler.Config["db_path"],
+		Workers: itoa(conf.Scheduler.Config["workers"]),
+	}
+	if key, ok := conf.Scheduler.Config["default_key"]; ok {
+		v := itoa(key)
+		c.Encryption = &EncryptionConfig{
+			Default: uint32(v),
+			Keys:    map[uint32][]byte{},
+		}
+
+		for k, v := range conf.Scheduler.Config {
+			if !strings.HasPrefix(k, "key_") {
+				continue
+			}
+
+			id := itoa(strings.TrimPrefix(k, "key_"))
+			c.Encryption.Keys[uint32(id)] = []byte(v)
+		}
+	}
+
 	if c.DB == "" {
 		c.DB = defaultDB
 	}
@@ -75,11 +105,12 @@ func NewScheduler(c Config) schedule.Scheduler {
 	}
 	return &scheduler{
 		config:   c,
-		handlers: make(map[string]func(string, []byte) error),
+		handlers: make(map[string]schedule.Fn),
 	}
 }
 
-func (s *scheduler) Start() error {
+func (s *scheduler) Start(ctx app.Ctx) error {
+	s.ctx = ctx
 	s.processor = newProcessor(s.config.Workers, s.process)
 	s.storage = newStorage(s.config.Encryption)
 	s.watcher = newWatcher(s.storage, s.processor.Exec())
@@ -131,7 +162,7 @@ func (s *scheduler) In(
 }
 
 func (s *scheduler) HandleFunc(
-	target string, fn func(string, []byte) error,
+	target string, fn schedule.Fn,
 ) (deregister func(), err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -167,7 +198,8 @@ func (s *scheduler) process(e *pb.Event) {
 	}
 
 	fn := s.handler(j.Target)
-	if err := fn(j.Id, j.Data); err == nil {
+	ctx := journey.New(s.ctx)
+	if err := fn(ctx, j.Id, j.Data); err == nil {
 		// Job succeed
 		return
 	}
@@ -201,7 +233,7 @@ func (s *scheduler) process(e *pb.Event) {
 	s.watcher.Notify(next.Due)
 }
 
-func (s *scheduler) handler(target string) func(string, []byte) error {
+func (s *scheduler) handler(target string) schedule.Fn {
 	s.mu.RLock()
 	fn, ok := s.handlers[target]
 	s.mu.RUnlock()
@@ -238,4 +270,9 @@ func min(a, b int64) int64 {
 		return a
 	}
 	return b
+}
+
+func itoa(s string) int {
+	i, _ := strconv.Atoi(s)
+	return i
 }

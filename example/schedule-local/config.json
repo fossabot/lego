@@ -13,6 +13,15 @@
   "stats": {
     "on": false
   },
+  "scheduler": {
+    "on": true,
+    "adapter": "local",
+    "config": {
+      "db_path": "schedule-cust.db",
+      "default_key": "0",
+      "key_0": "fe1e22b23c90b4fb1f9b758979d9c06c"
+    }
+  },
   "request": {
     "timeout_ms": 500
   },

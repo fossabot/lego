@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/stairlin/lego"
-	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/net/http"
-	"github.com/stairlin/lego/schedule/local"
+	"github.com/stairlin/lego/schedule"
 )
 
 type AppConfig struct {
@@ -36,44 +35,31 @@ func main() {
 
 func start(app *lego.App) error {
 	// Create scheduler
-	keys := map[uint32][]byte{}
-	keys[0] = []byte("fe1e22b23c90b4fb1f9b758979d9c06c")
-
-	scheduler := local.NewScheduler(local.Config{
-		DB: "schedule.db",
-		Encryption: &local.EncryptionConfig{
-			Default: 0,
-			Keys:    keys,
-		},
-	})
-	if err := scheduler.Start(); err != nil {
-		return err
-	}
-	scheduler.HandleFunc("foo", func(id string, data []byte) error {
-		app.Ctx().Trace("schedule.process", "Process job",
+	scheduler := app.Scheduler()
+	scheduler.HandleFunc("foo", func(ctx journey.Ctx, id string, data []byte) error {
+		ctx.Trace("schedule.process", "Process job",
 			log.String("job_id", id),
 			log.String("job_data", string(data)),
 		)
 		return nil
 	})
-	scheduler.HandleFunc("err", func(id string, data []byte) error {
-		app.Ctx().Trace("schedule.process", "Process job",
+	scheduler.HandleFunc("err", func(ctx journey.Ctx, id string, data []byte) error {
+		ctx.Trace("schedule.process", "Process job",
 			log.String("job_id", id),
 			log.String("job_data", string(data)),
 		)
 		return errors.New("job failed")
 	})
-	scheduler.HandleFunc("panic", func(id string, data []byte) error {
-		app.Ctx().Trace("schedule.process", "Process job",
+	scheduler.HandleFunc("panic", func(ctx journey.Ctx, id string, data []byte) error {
+		ctx.Trace("schedule.process", "Process job",
 			log.String("job_id", id),
 			log.String("job_data", string(data)),
 		)
 		panic("BOOM!")
 	})
-	app.Ctx().SetSchedule(scheduler)
 
 	// Register HTTP handler
-	h := handler{ctx: app.Ctx()}
+	h := handler{scheduler: scheduler}
 	s := http.NewServer()
 	s.HandleFunc("/job/{target}", http.POST, h.scheduleJob)
 	app.RegisterServer("127.0.0.1:3000", s)
@@ -87,7 +73,7 @@ func start(app *lego.App) error {
 }
 
 type handler struct {
-	ctx app.Ctx
+	scheduler schedule.Scheduler
 }
 
 type job struct {
@@ -111,7 +97,7 @@ func (h *handler) scheduleJob(ctx journey.Ctx, w http.ResponseWriter, r *http.Re
 	j.Target = r.Params["target"]
 
 	// Schedule job
-	id, err := h.ctx.Schedule().In(ctx, j.In*time.Second, j.Target, []byte(j.Data))
+	id, err := h.scheduler.In(ctx, j.In*time.Second, j.Target, []byte(j.Data))
 	if err != nil {
 		ctx.Warning("schedule.create.err", "Error creating job", log.Error(err))
 		w.WriteHeader(http.StatusBadRequest)

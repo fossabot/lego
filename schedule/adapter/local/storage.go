@@ -11,7 +11,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/stairlin/lego/crypto"
-	pb "github.com/stairlin/lego/schedule/local/localpb"
+	pb "github.com/stairlin/lego/schedule/adapter/local/localpb"
 )
 
 const (

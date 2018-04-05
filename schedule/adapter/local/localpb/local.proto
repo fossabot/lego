@@ -23,7 +23,8 @@ message Job {
   int64 due = 3;
   bytes data = 4;
 
-  JobOptions options = 15;
+  JobOptions options = 14;
+  // Interval interval = 15;
 }
 
 // JobOptions contains job execution options

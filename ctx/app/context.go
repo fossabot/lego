@@ -15,8 +15,6 @@ import (
 	"github.com/stairlin/lego/ctx"
 	"github.com/stairlin/lego/disco"
 	"github.com/stairlin/lego/log"
-	"github.com/stairlin/lego/schedule"
-	"github.com/stairlin/lego/schedule/inmem"
 	"github.com/stairlin/lego/stats"
 )
 
@@ -31,8 +29,6 @@ type Ctx interface {
 	Disco() disco.Agent
 	Cache() cache.Cache
 	SetCache(cache.Cache)
-	Schedule() schedule.Scheduler
-	SetSchedule(schedule.Scheduler)
 	Drain()
 	Cancel()
 }
@@ -43,7 +39,6 @@ type context struct {
 	bgReg      *bg.Reg
 	disco      disco.Agent
 	cache      cache.Cache
-	scheduler  schedule.Scheduler
 	c          goc.Context
 	cancelFunc goc.CancelFunc
 	service    string
@@ -77,7 +72,6 @@ func NewCtx(
 		bgReg:      reg,
 		disco:      sd,
 		cache:      cache.New(),
-		scheduler:  inmem.NewScheduler(),
 		c:          ctx,
 		cancelFunc: cancelFunc,
 		l:          l.AddCalldepth(1),
@@ -116,14 +110,6 @@ func (c *context) Cache() cache.Cache {
 
 func (c *context) SetCache(ca cache.Cache) {
 	c.cache = ca
-}
-
-func (c *context) Schedule() schedule.Scheduler {
-	return c.scheduler
-}
-
-func (c *context) SetSchedule(s schedule.Scheduler) {
-	c.scheduler = s
 }
 
 func (c *context) Drain() {

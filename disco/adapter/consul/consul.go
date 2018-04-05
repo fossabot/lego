@@ -24,7 +24,8 @@ import (
 const Name = "consul"
 
 // New returns a new file config store
-func New(c *config.Config, params map[string]string) (disco.Agent, error) {
+func New(c *config.Config) (disco.Agent, error) {
+	params := c.Disco.Config
 	// Configure client
 	cc := api.DefaultConfig()
 	cc.Address = config.ValueOf(params["address"])

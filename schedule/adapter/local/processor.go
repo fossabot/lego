@@ -1,7 +1,7 @@
 package local
 
 import (
-	pb "github.com/stairlin/lego/schedule/local/localpb"
+	pb "github.com/stairlin/lego/schedule/adapter/local/localpb"
 )
 
 // processor spawns a pool of goroutines to process events in parallel
