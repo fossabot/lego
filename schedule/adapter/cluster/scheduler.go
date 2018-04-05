@@ -1,4 +1,4 @@
-package schedule
+package cluster
 
 import (
 	"encoding/json"
@@ -12,6 +12,9 @@ import (
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/schedule"
 )
+
+// Name contains the adapter registered name
+const Name = "cluster"
 
 // TODO:
 // - Reap expired jobs (e.g. done, lost, or stale)

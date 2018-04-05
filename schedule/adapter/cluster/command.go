@@ -1,4 +1,4 @@
-package schedule
+package cluster
 
 type command struct {
 	Op    string `json:"op,omitempty"`

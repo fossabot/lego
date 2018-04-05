@@ -10,7 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stairlin/lego"
-	"github.com/stairlin/lego/net/schedule"
+	"github.com/stairlin/lego/schedule/adapter/cluster"
 )
 
 type AppConfig struct {
@@ -39,7 +39,7 @@ func start(app *lego.App) error {
 	tags := []string{"v1"}
 
 	// Create schedule server
-	server := schedule.NewServer()
+	server := cluster.NewServer()
 
 	// Register it as a service
 	id := fmt.Sprintf("schedule.%s", app.Config().Node)
@@ -57,8 +57,8 @@ func start(app *lego.App) error {
 		return errors.Wrap(err, "error getting service")
 	}
 	server.AddOptions(
-		schedule.OptID(id),
-		schedule.OptDisco(svc),
+		cluster.OptID(id),
+		cluster.OptDisco(svc),
 	)
 
 	// Start serving requests
