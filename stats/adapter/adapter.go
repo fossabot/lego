@@ -65,7 +65,7 @@ func New(config config.Tree) (stats.Stats, error) {
 	adapter := keys[0]
 
 	if f, ok := adapters[adapter]; ok {
-		return f(config)
+		return f(config.Get(adapter))
 	}
 	return nil, fmt.Errorf("stats adapter not found <%s>", adapter)
 }
