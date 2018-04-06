@@ -23,7 +23,7 @@
 
 [[constraint]]
   name = "github.com/fatih/color"
-  version = "1.5.0"
+  version = "1.6.0"
 
 [[constraint]]
   branch = "master"
@@ -31,11 +31,11 @@
 
 [[constraint]]
   name = "github.com/gorilla/mux"
-  version = "1.6.0"
+  version = "1.6.1"
 
 [[constraint]]
   name = "github.com/hashicorp/consul"
-  version = "1.0.2"
+  version = "1.0.6"
 
 [[constraint]]
   name = "github.com/pkg/errors"
@@ -51,7 +51,7 @@
 
 [[constraint]]
   name = "google.golang.org/grpc"
-  version = "1.8.2"
+  version = "1.11.2"
 
 [[constraint]]
   branch = "master"
