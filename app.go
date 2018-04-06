@@ -14,11 +14,13 @@ import (
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/disco"
-	da "github.com/stairlin/lego/disco/adapter"
+	discoA "github.com/stairlin/lego/disco/adapter"
 	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/log/logger"
 	"github.com/stairlin/lego/net"
-	sa "github.com/stairlin/lego/stats/adapter"
+	"github.com/stairlin/lego/schedule"
+	scheduleA "github.com/stairlin/lego/schedule/adapter"
+	statsA "github.com/stairlin/lego/stats/adapter"
 )
 
 const (
@@ -32,11 +34,13 @@ type App struct {
 	mu    sync.Mutex
 	ready *sync.Cond
 
-	service string
-	ctx     app.Ctx
-	config  *config.Config
-	disco   disco.Agent
-	servers *net.Reg
+	service       string
+	ctx           app.Ctx
+	config        *config.Config
+	disco         disco.Agent
+	scheduler     schedule.Scheduler
+	servers       *net.Reg
+	registrations []*disco.Registration
 
 	state uint32
 	done  chan bool
@@ -69,20 +73,26 @@ func NewWithConfig(service string, c *config.Config) (*App, error) {
 	// Create logger
 	l, err := logger.New(service, &c.Log)
 	if err != nil {
-		return nil, fmt.Errorf("logger error: %s", err)
+		return nil, errors.Wrap(err, "error initialising logger")
 	}
 
 	// Build stats
-	s, err := sa.New(&c.Stats)
+	s, err := statsA.New(&c.Stats)
 	if err != nil {
-		return nil, fmt.Errorf("stats error: %s", err)
+		return nil, errors.Wrap(err, "error initialising stats")
 	}
 	s.SetLogger(l)
 
-	// Service discovery
-	sd, err := da.New(c)
+	// Build service discovery
+	sd, err := discoA.New(c)
 	if err != nil {
-		return nil, fmt.Errorf("disco error: %s", err)
+		return nil, errors.Wrap(err, "error initialising disco")
+	}
+
+	// Build scheduler
+	sh, err := scheduleA.New(c)
+	if err != nil {
+		return nil, errors.Wrap(err, "error initialising scheduler")
 	}
 
 	// Build app context
@@ -95,13 +105,14 @@ func NewWithConfig(service string, c *config.Config) (*App, error) {
 
 	// Build app struct
 	app := &App{
-		service: service,
-		ready:   ready,
-		ctx:     ctx,
-		config:  c,
-		disco:   sd,
-		servers: net.NewReg(ctx),
-		done:    make(chan bool, 1),
+		service:   service,
+		ready:     ready,
+		ctx:       ctx,
+		config:    c,
+		disco:     sd,
+		scheduler: sh,
+		servers:   net.NewReg(ctx),
+		done:      make(chan bool, 1),
 	}
 
 	// Start background services
@@ -111,12 +122,21 @@ func NewWithConfig(service string, c *config.Config) (*App, error) {
 	// Trap OS signals
 	go trapSignals(app)
 
+	// Start Scheduler
+	if err := sh.Start(ctx); err != nil {
+		return nil, errors.Wrap(err, "error starting scheduler")
+	}
+
 	return app, nil
 }
 
 // Config returns the lego config
 func (a *App) Config() *config.Config {
 	return a.config
+}
+
+func (a *App) Scheduler() schedule.Scheduler {
+	return a.scheduler
 }
 
 // Serve allows handlers to serve requests and blocks the call
@@ -147,6 +167,13 @@ func (a *App) Serve() error {
 			log.Error(err),
 		)
 		return err
+	}
+
+	for _, reg := range a.registrations {
+		_, err := a.disco.Register(a.Ctx(), reg)
+		if err != nil {
+			return errors.Wrapf(err, "error registering service <%s>", reg.Name)
+		}
 	}
 
 	// Notify all callees that the app is up and running
@@ -206,6 +233,7 @@ func (a *App) Close() error {
 }
 
 func (a *App) close() {
+	a.scheduler.Close()
 	a.ctx.Cancel()
 
 	a.done <- true
@@ -224,28 +252,33 @@ func (a *App) RegisterServer(addr string, s net.Server) {
 
 // ServiceRegistration contains info to register a service
 type ServiceRegistration struct {
-	Name   string
-	Host   string
-	Port   uint16
+	// ID is the service instance unique identifier (optional)
+	ID string
+	// Name is the service identifier
+	Name string
+	// Host is the interface on which the server runs.
+	// Service discovery can override this value.
+	Host string
+	// Port is the port number
+	Port uint16
+	// Server is the server that provides the registered service
 	Server net.Server
-	Tags   []string
+	// Tags for that service (versioning, blue-green, whatever)
+	Tags []string
 }
 
 // RegisterService adds the server to the list of managed servers and registers
 // it to service discovery
-func (a *App) RegisterService(r *ServiceRegistration) error {
+func (a *App) RegisterService(r *ServiceRegistration) {
 	a.servers.Add(net.JoinHostPort(r.Host, strconv.Itoa(int(r.Port))), r.Server)
 
-	dr := disco.Registration{
+	a.registrations = append(a.registrations, &disco.Registration{
+		ID:   r.ID,
 		Name: r.Name,
 		Addr: r.Host,
 		Port: r.Port,
 		Tags: append(r.Tags, a.service),
-	}
-	if _, err := a.disco.Register(a.Ctx(), &dr); err != nil {
-		return errors.Wrap(err, "error registering service")
-	}
-	return nil
+	})
 }
 
 // Disco returns the active service discovery agent.

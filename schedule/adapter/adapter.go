@@ -6,12 +6,12 @@ import (
 	"sync"
 
 	"github.com/stairlin/lego/config"
-	"github.com/stairlin/lego/disco"
-	"github.com/stairlin/lego/disco/adapter/consul"
+	"github.com/stairlin/lego/schedule"
+	"github.com/stairlin/lego/schedule/adapter/local"
 )
 
 // Adapter returns a new agent initialised with the given config
-type Adapter func(*config.Config) (disco.Agent, error)
+type Adapter func(*config.Config) schedule.Scheduler
 
 var (
 	mu       sync.RWMutex
@@ -20,7 +20,7 @@ var (
 
 func init() {
 	// Register default adapters
-	Register(consul.Name, consul.New)
+	Register(local.Name, local.New)
 }
 
 // Adapters returns the list of registered adapters
@@ -38,33 +38,33 @@ func Adapters() []string {
 	return l
 }
 
-// Register makes a registrar adapter available by the provided name.
+// Register makes a scheduler adapter available by the provided name.
 // If an adapter is registered twice or if an adapter is nil, it will panic.
 func Register(name string, adapter Adapter) {
 	mu.Lock()
 	defer mu.Unlock()
 
 	if adapter == nil {
-		panic("disco: Registered adapter is nil")
+		panic("schedule: Registered adapter is nil")
 	}
 	if _, dup := adapters[name]; dup {
-		panic("disco: Duplicated adapter")
+		panic("schedule: Duplicated adapter")
 	}
 
 	adapters[name] = adapter
 }
 
-// New creates a new service discovery agent
-func New(config *config.Config) (disco.Agent, error) {
-	if !config.Disco.On {
-		return newLocalAgent(), nil
+// New creates a new scheduler
+func New(config *config.Config) (schedule.Scheduler, error) {
+	if !config.Scheduler.On {
+		return newNullScheduler(), nil
 	}
 
 	mu.RLock()
 	defer mu.RUnlock()
 
-	if f, ok := adapters[config.Disco.Adapter]; ok {
-		return f(config)
+	if f, ok := adapters[config.Scheduler.Adapter]; ok {
+		return f(config), nil
 	}
-	return nil, fmt.Errorf("disco adapter not found <%s>", config.Disco.Adapter)
+	return nil, fmt.Errorf("schedule adapter not found <%s>", config.Disco.Adapter)
 }

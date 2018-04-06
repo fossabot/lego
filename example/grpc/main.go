@@ -44,16 +44,12 @@ func main() {
 	api := &publicAPI{}
 	hs.HandleFunc("hello", http.GET, api.Hello)
 
-	err = app.RegisterService(&lego.ServiceRegistration{
+	app.RegisterService(&lego.ServiceRegistration{
 		Name:   "api.cache",
 		Host:   "127.0.0.1",
 		Port:   uint16(port),
 		Server: hs,
 	})
-	if err != nil {
-		fmt.Println("Problem registering service", err)
-		os.Exit(1)
-	}
 
 	// Start serving requests
 	err = app.Serve()

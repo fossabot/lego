@@ -38,17 +38,13 @@ func main() {
 	// Register service
 	s := http.NewServer()
 	s.HandleFunc("/hello", http.GET, Hello)
-	err = app.RegisterService(&lego.ServiceRegistration{
+	app.RegisterService(&lego.ServiceRegistration{
 		Name:   "api.http",
 		Host:   "127.0.0.1",
 		Port:   uint16(port),
 		Server: s,
 		Tags:   tags,
 	})
-	if err != nil {
-		fmt.Println("Problem registering service", err)
-		os.Exit(1)
-	}
 
 	// Listen to service discovery events for that service
 	svc, err := app.Disco().Service(app.Ctx(), "api.http", tags...)

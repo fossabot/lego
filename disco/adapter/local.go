@@ -31,7 +31,10 @@ func (a *localAgent) Register(ctx ctx.Ctx, r *disco.Registration) (string, error
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	id := uuid.New().String()
+	id := r.ID
+	if id == "" {
+		id = uuid.New().String()
+	}
 	if _, ok := a.Registry[id]; ok {
 		return "", errors.New("service already registered")
 	}

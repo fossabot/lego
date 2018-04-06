@@ -46,17 +46,13 @@ func main() {
 	// Register cache service
 	cacheServer := netCache.NewServer(app.Ctx().Cache())
 	app.Ctx().SetCache(cacheServer)
-	err = app.RegisterService(&lego.ServiceRegistration{
+	app.RegisterService(&lego.ServiceRegistration{
 		Name:   "api.cache",
 		Host:   "127.0.0.1",
 		Port:   uint16(port),
 		Server: cacheServer,
 		Tags:   tags,
 	})
-	if err != nil {
-		fmt.Println("Problem registering service", err)
-		os.Exit(1)
-	}
 
 	// Listen to service updates
 	w, err := naming.Resolve(app.Ctx(), "disco://api.cache?tag=v1")

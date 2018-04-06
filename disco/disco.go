@@ -44,10 +44,13 @@ type Instance struct {
 	Local bool
 	// ID is the unique instance identifier
 	ID string
-	// Name is a friendly name
+	// Name of the service
 	Name string
+	// Host is the IP address or DNS name
 	Host string
+	// Port defines the port on which the service runs
 	Port uint16
+	// Tags of that instance
 	Tags []string
 }
 
@@ -58,6 +61,9 @@ func (i *Instance) Addr() string {
 
 // Registration allows to register a service
 type Registration struct {
+	// ID is the unique identifier for the service (optional)
+	ID string
+	// Name is the service name
 	Name string
 	Addr string
 	Port uint16
