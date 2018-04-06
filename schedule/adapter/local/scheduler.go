@@ -5,7 +5,6 @@ import (
 	"math"
 	"math/rand"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -53,13 +52,13 @@ type scheduler struct {
 // Config is the local scheduler configuration
 type Config struct {
 	// DB is the path to the database file
-	DB string
+	DB string `toml:"db"`
 	// Workers is the maximum number of goroutines that process jobs in parallel
-	Workers int
+	Workers int `toml:"workers"`
 	// Encryption activates data encryption.
 	// It is worth noting that once a database created, it is no longer possible
 	// to change this option.
-	Encryption *EncryptionConfig
+	Encryption *EncryptionConfig `toml:"encryption"`
 }
 
 // EncryptionConfig is the configuration to encrypt data stored.
@@ -67,34 +66,18 @@ type Config struct {
 // affecting existing data. Old keys should be kept (almost) forever.
 type EncryptionConfig struct {
 	// Default is the key to use to encrypt new data
-	Default uint32
+	Default uint32 `toml:"default"`
 	// Keys contains all encryption keys available
-	Keys map[uint32][]byte
+	Keys []string `toml:"keys"`
 }
 
 // New creates a scheduler that persists data locally.
 // This scheduler cannot be used on a distributed setup. Use net/schedule when
 // running multiple lego instances.
-func New(conf *config.Config) schedule.Scheduler {
-	c := Config{
-		DB:      conf.Scheduler.Config["db_path"],
-		Workers: itoa(conf.Scheduler.Config["workers"]),
-	}
-	if key, ok := conf.Scheduler.Config["default_key"]; ok {
-		v := itoa(key)
-		c.Encryption = &EncryptionConfig{
-			Default: uint32(v),
-			Keys:    map[uint32][]byte{},
-		}
-
-		for k, v := range conf.Scheduler.Config {
-			if !strings.HasPrefix(k, "key_") {
-				continue
-			}
-
-			id := itoa(strings.TrimPrefix(k, "key_"))
-			c.Encryption.Keys[uint32(id)] = []byte(v)
-		}
+func New(tree config.Tree) (schedule.Scheduler, error) {
+	c := Config{}
+	if err := tree.Unmarshal(&c); err != nil {
+		return nil, err
 	}
 
 	if c.DB == "" {
@@ -106,7 +89,7 @@ func New(conf *config.Config) schedule.Scheduler {
 	return &scheduler{
 		config:   c,
 		handlers: make(map[string]schedule.Fn),
-	}
+	}, nil
 }
 
 func (s *scheduler) Start(ctx app.Ctx) error {

@@ -45,7 +45,6 @@ func main() {
 
 	// Register cache service
 	cacheServer := netCache.NewServer(app.Ctx().Cache())
-	app.Ctx().SetCache(cacheServer)
 	app.RegisterService(&lego.ServiceRegistration{
 		Name:   "api.cache",
 		Host:   "127.0.0.1",

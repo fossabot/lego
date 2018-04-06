@@ -1,2 +1,2 @@
 start:
-		CONFIG_URI=file://${PWD}/config.json go run main.go
+		CONFIG_URI=file://${PWD}/config.toml go run main.go

@@ -24,13 +24,17 @@ import (
 const Name = "consul"
 
 // New returns a new file config store
-func New(c *config.Config) (disco.Agent, error) {
-	params := c.Disco.Config
+func New(tree config.Tree) (disco.Agent, error) {
+	config := &Config{}
+	if err := tree.Unmarshal(config); err != nil {
+		return nil, err
+	}
+
 	// Configure client
 	cc := api.DefaultConfig()
-	cc.Address = config.ValueOf(params["address"])
-	cc.Datacenter = config.ValueOf(params["dc"])
-	cc.Token = config.ValueOf(params["token"])
+	cc.Address = config.Address
+	cc.Datacenter = config.DC
+	cc.Token = config.Token
 
 	// Build Consul client
 	consul, err := api.NewClient(cc)
@@ -41,10 +45,18 @@ func New(c *config.Config) (disco.Agent, error) {
 	return &Agent{
 		consul:       consul,
 		consulConfig: cc,
-		appConfig:    c,
+		config:       config,
 		serviceIDs:   map[string]struct{}{},
-		advertAddr:   config.ValueOf(c.Disco.AdvertiseAddr),
 	}, nil
+}
+
+// Config contains the configuration to start a service discovery agent
+type Config struct {
+	AdvertiseAddr string   `json:"advertise_addr"`
+	DefaultTags   []string `json:"default_tags"`
+	Address       string   `json:"address"`
+	DC            string   `json:"dc"`
+	Token         string   `json:"token"`
 }
 
 type Agent struct {
@@ -52,7 +64,7 @@ type Agent struct {
 
 	consul       *api.Client
 	consulConfig *api.Config
-	appConfig    *config.Config
+	config       *Config
 	advertAddr   string
 
 	// serviceIDs caches the list of services registered
@@ -60,7 +72,7 @@ type Agent struct {
 }
 
 func (a *Agent) Register(ctx ctx.Ctx, r *disco.Registration) (string, error) {
-	tags := append(a.appConfig.Disco.DefaultTags, r.Tags...)
+	tags := append(a.config.DefaultTags, r.Tags...)
 	reg := api.AgentServiceRegistration{
 		ID:      r.ID,
 		Name:    r.Name,

@@ -160,3 +160,10 @@ const (
 	// That means it will be either executed once or executed multiple times.
 	AtLeastOnce
 )
+
+// Config contains the configuration to start a job scheduler
+type Config struct {
+	On      bool              `json:"on"`
+	Adapter string            `json:"adapter"`
+	Config  map[string]string `json:"config"`
+}

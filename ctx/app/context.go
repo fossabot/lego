@@ -28,7 +28,6 @@ type Ctx interface {
 	BG() *bg.Reg
 	Disco() disco.Agent
 	Cache() cache.Cache
-	SetCache(cache.Cache)
 	Drain()
 	Cancel()
 }
@@ -106,10 +105,6 @@ func (c *context) Disco() disco.Agent {
 
 func (c *context) Cache() cache.Cache {
 	return c.cache
-}
-
-func (c *context) SetCache(ca cache.Cache) {
-	c.cache = ca
 }
 
 func (c *context) Drain() {

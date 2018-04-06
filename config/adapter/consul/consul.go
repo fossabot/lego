@@ -8,9 +8,10 @@
 package consul
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/url"
 	"strings"
 
@@ -28,9 +29,6 @@ var ErrMissingStoreKey = errors.New("cannot initialise config without store key"
 
 // ErrStoreKeyNotFound means the configuration does not exist on Consul
 var ErrStoreKeyNotFound = errors.New("store config does not exist")
-
-// ErrStoreConfigEmpty means the configuration exists, but it is empty
-var ErrStoreConfigEmpty = errors.New("store config is empty")
 
 // New returns a new file config store
 func New(uri *url.URL) (a.Store, error) {
@@ -66,8 +64,8 @@ type Store struct {
 	Key    string
 }
 
-// Load config for the given environment
-func (s *Store) Load(config interface{}) error {
+// Load implements Store
+func (s *Store) Load() (io.ReadCloser, error) {
 	// Get a handle to the KV API
 	kv := s.Client.KV()
 
@@ -75,17 +73,13 @@ func (s *Store) Load(config interface{}) error {
 	pair, _, err := kv.Get(s.Key, nil)
 	if err != nil {
 		if err == io.EOF {
-			return ErrStoreKeyNotFound
+			return nil, ErrStoreKeyNotFound
 		}
-		return errors.Wrap(err, "cannot get config from Consul")
+		return nil, errors.Wrap(err, "cannot get config from Consul")
 	}
 	if pair == nil {
-		return fmt.Errorf("store pair is nil. the key `%s` is probably missing on Consul", s.Key)
-	}
-	if len(pair.Value) == 0 {
-		return ErrStoreConfigEmpty
+		return nil, fmt.Errorf("store pair is nil. the key `%s` is probably missing on Consul", s.Key)
 	}
 
-	// Unmarshal
-	return json.Unmarshal(pair.Value, config)
+	return ioutil.NopCloser(bytes.NewReader(pair.Value)), nil
 }

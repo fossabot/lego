@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/stairlin/lego/config"
-	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/stats"
 	"github.com/stairlin/lego/stats/adapter/statsd"
 )
@@ -17,28 +15,7 @@ func init() {
 }
 
 // Adapter returns a new store initialised with the given config
-type Adapter func(config map[string]string) (stats.Stats, error)
-
-// Void is a null stats adapter
-type Void struct{}
-
-func (s *Void) Start()                                                         {}
-func (s *Void) Stop()                                                          {}
-func (s *Void) SetLogger(l log.Logger)                                         {}
-func (s *Void) Count(key string, n interface{}, meta ...map[string]string)     {}
-func (s *Void) Inc(key string, meta ...map[string]string)                      {}
-func (s *Void) Dec(key string, meta ...map[string]string)                      {}
-func (s *Void) Gauge(key string, n interface{}, meta ...map[string]string)     {}
-func (s *Void) Timing(key string, t time.Duration, meta ...map[string]string)  {}
-func (s *Void) Histogram(key string, n interface{}, tags ...map[string]string) {}
-
-func New(config *config.Stats) (stats.Stats, error) {
-	if !config.On {
-		return &Void{}, nil
-	}
-
-	return newStats(config.Adapter, config.Config)
-}
+type Adapter func(config config.Tree) (stats.Stats, error)
 
 var (
 	adaptersMu sync.RWMutex
@@ -76,14 +53,24 @@ func Register(name string, adapter Adapter) {
 	adapters[name] = adapter
 }
 
-// NewStore returns a new stats instance
-func newStats(adapter string, config map[string]string) (stats.Stats, error) {
+// New returns a new stats instance
+func New(config config.Tree) (stats.Stats, error) {
 	adaptersMu.RLock()
 	defer adaptersMu.RUnlock()
+
+	keys := config.Keys()
+	if len(keys) == 0 {
+		return Null(), nil
+	}
+	adapter := keys[0]
 
 	if f, ok := adapters[adapter]; ok {
 		return f(config)
 	}
-
 	return nil, fmt.Errorf("stats adapter not found <%s>", adapter)
+}
+
+// Null returns a stats adapter that does not do anything
+func Null() stats.Stats {
+	return &null{}
 }

@@ -17,3 +17,20 @@ func ValueOf(s string) string {
 	}
 	return s
 }
+
+// ValuesOf extracts the environment variable(s) from v
+func ValuesOf(v interface{}) interface{} {
+	switch v := v.(type) {
+	case string:
+		if strings.HasPrefix(v, prefix) && len(v) > 1 {
+			return os.Getenv(v[1:])
+		}
+	case []interface{}:
+		r := make([]interface{}, len(v))
+		for i := range v {
+			r[i] = ValuesOf(v[i])
+		}
+		return r
+	}
+	return v
+}

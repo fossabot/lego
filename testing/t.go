@@ -27,16 +27,12 @@ type T struct {
 // New returns a new instance of T
 func New(t *testing.T) *T {
 	config := &config.Config{}
-	disco, err := da.New(config)
-	if err != nil {
-		t.Fatal(err)
-	}
 	return &T{
 		t:      t,
 		logger: NewLogger(t, true),
 		stats:  NewStats(t),
 		config: config,
-		disco:  disco,
+		disco:  da.Local(),
 	}
 }
 

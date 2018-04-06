@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/fatih/color"
+	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/log"
 )
 
@@ -18,7 +19,7 @@ var (
 	unknownColour = color.New(color.FgWhite)
 )
 
-func New(c map[string]string) (log.Printer, error) {
+func New(c config.Tree) (log.Printer, error) {
 	return &Logger{}, nil
 }
 

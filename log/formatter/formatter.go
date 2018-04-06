@@ -17,11 +17,7 @@ func init() {
 }
 
 // Adapter returns a new logger initialised with the given config
-type Adapter func(config map[string]string) (log.Formatter, error)
-
-func New(config *config.Log) (log.Formatter, error) {
-	return newFormatter(config.Formatter.Adapter, config.Formatter.Config)
-}
+type Adapter func(config config.Tree) (log.Formatter, error)
 
 var (
 	adaptersMu sync.RWMutex
@@ -59,14 +55,17 @@ func Register(name string, adapter Adapter) {
 	adapters[name] = adapter
 }
 
-// newLogger returns a new logger instance
-func newFormatter(adapter string, config map[string]string) (log.Formatter, error) {
+// New returns a new logger instance
+func New(adapter string, config config.Tree) (log.Formatter, error) {
 	adaptersMu.RLock()
 	defer adaptersMu.RUnlock()
 
-	if f, ok := adapters[adapter]; ok {
-		return f(config)
+	if adapter == "" {
+		return logf.New(config.Get(logf.Name))
 	}
 
+	if f, ok := adapters[adapter]; ok {
+		return f(config.Get(adapter))
+	}
 	return nil, fmt.Errorf("log formatter not found <%s>", adapter)
 }

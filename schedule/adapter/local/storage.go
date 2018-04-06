@@ -50,7 +50,11 @@ type storage struct {
 func newStorage(c *EncryptionConfig) *storage {
 	storage := &storage{}
 	if c != nil {
-		storage.crypto = crypto.NewRotor(c.Keys, c.Default)
+		keys := make(map[uint32][]byte)
+		for i, v := range c.Keys {
+			keys[uint32(i)] = []byte(v)
+		}
+		storage.crypto = crypto.NewRotor(keys, c.Default)
 	}
 	return storage
 }

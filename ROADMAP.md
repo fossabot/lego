@@ -1,8 +1,5 @@
 # Roadmap
 
-## Config
- * Use TOML instead of JSON to avoid using generic map[string]string
-
 ## Schedule
  * Finish net/schedule implementation
  * Move net/schedule to schedule package and add it to base config

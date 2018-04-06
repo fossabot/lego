@@ -1,30 +1,46 @@
 package local_test
 
 import (
+	"bytes"
 	"os"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/schedule/adapter/local"
 	lt "github.com/stairlin/lego/testing"
 )
 
-func Test_Init(t *testing.T) {
-	t.Parallel()
+var schedulerConfig = []byte(`
+[schedule.local]
+	db = "test.db"
+	workers = 4`)
 
+var schedulerWithEncryptConfig = []byte(`
+[schedule.local]
+	db = "test.db"
+	workers = 4
+
+[schedule.local.encryption]
+  default = 0
+  keys = ["fe1e22b23c90b4fb1f9b758979d9c06c"]`)
+
+func Test_Init(t *testing.T) {
 	tt := lt.New(t)
 	ctx := tt.NewAppCtx(t.Name())
 
-	path := strings.ToLower(t.Name()) + ".db"
-	config := ctx.Config()
-	config.Scheduler.Config = map[string]string{}
-	config.Scheduler.Config["db_path"] = path
+	configTree, err := config.LoadTree(bytes.NewReader(schedulerConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	scheduler := local.New(config)
-	defer os.Remove(path)
+	scheduler, err := local.New(configTree.Get("schedule.local"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("test.db")
 
 	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
@@ -36,18 +52,20 @@ func Test_Init(t *testing.T) {
 }
 
 func Test_At(t *testing.T) {
-	t.Parallel()
-
 	tt := lt.New(t)
 	ctx := tt.NewAppCtx(t.Name())
 
-	path := strings.ToLower(t.Name()) + ".db"
-	config := ctx.Config()
-	config.Scheduler.Config = map[string]string{}
-	config.Scheduler.Config["db_path"] = path
+	configTree, err := config.LoadTree(bytes.NewReader([]byte(schedulerConfig)))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	scheduler := local.New(config)
-	defer os.Remove(path)
+	scheduler, err := local.New(configTree.Get("schedule.local"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("test.db")
+
 	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
@@ -66,18 +84,20 @@ func Test_At(t *testing.T) {
 }
 
 func Test_In(t *testing.T) {
-	t.Parallel()
-
 	tt := lt.New(t)
 	ctx := tt.NewAppCtx(t.Name())
 
-	path := strings.ToLower(t.Name()) + ".db"
-	config := ctx.Config()
-	config.Scheduler.Config = map[string]string{}
-	config.Scheduler.Config["db_path"] = path
+	configTree, err := config.LoadTree(bytes.NewReader([]byte(schedulerConfig)))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	scheduler := local.New(config)
-	defer os.Remove(path)
+	scheduler, err := local.New(configTree.Get("schedule.local"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("test.db")
+
 	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
@@ -96,18 +116,19 @@ func Test_In(t *testing.T) {
 }
 
 func Test_HandleFunc(t *testing.T) {
-	t.Parallel()
-
 	tt := lt.New(t)
 	ctx := tt.NewAppCtx(t.Name())
 
-	path := strings.ToLower(t.Name()) + ".db"
-	config := ctx.Config()
-	config.Scheduler.Config = map[string]string{}
-	config.Scheduler.Config["db_path"] = path
+	configTree, err := config.LoadTree(bytes.NewReader([]byte(schedulerConfig)))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	scheduler := local.New(config)
-	defer os.Remove(path)
+	scheduler, err := local.New(configTree.Get("schedule.local"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("test.db")
 
 	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
@@ -150,18 +171,20 @@ func Test_HandleFunc(t *testing.T) {
 // Test_DequeueValidJobs ensures that only scheduled now or in the past
 // are being executed
 func Test_DequeueValidJobs(t *testing.T) {
-	t.Parallel()
-
 	tt := lt.New(t)
 	ctx := tt.NewAppCtx(t.Name())
 
-	path := strings.ToLower(t.Name()) + ".db"
-	config := ctx.Config()
-	config.Scheduler.Config = map[string]string{}
-	config.Scheduler.Config["db_path"] = path
+	configTree, err := config.LoadTree(bytes.NewReader([]byte(schedulerConfig)))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	scheduler := local.New(config)
-	defer os.Remove(path)
+	scheduler, err := local.New(configTree.Get("schedule.local"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("test.db")
+
 	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
 	}
@@ -222,18 +245,19 @@ func Test_DequeueValidJobs(t *testing.T) {
 
 // Test_LeaveFutureJobs ensures that future jobs are not executed
 func Test_LeaveFutureJobs(t *testing.T) {
-	t.Parallel()
-
 	tt := lt.New(t)
 	ctx := tt.NewAppCtx(t.Name())
 
-	path := strings.ToLower(t.Name()) + ".db"
-	config := ctx.Config()
-	config.Scheduler.Config = map[string]string{}
-	config.Scheduler.Config["db_path"] = path
+	configTree, err := config.LoadTree(bytes.NewReader([]byte(schedulerConfig)))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	scheduler := local.New(config)
-	defer os.Remove(path)
+	scheduler, err := local.New(configTree.Get("schedule.local"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("test.db")
 
 	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
@@ -263,18 +287,18 @@ func Test_LeaveFutureJobs(t *testing.T) {
 
 // TestStorage_Encryption ensures data is encrypted
 func TestStorage_Encryption(t *testing.T) {
-	t.Parallel()
-
 	tt := lt.New(t)
 	ctx := tt.NewAppCtx(t.Name())
 
-	path := strings.ToLower(t.Name()) + ".db"
-	config := ctx.Config()
-	config.Scheduler.Config = map[string]string{}
-	config.Scheduler.Config["db_path"] = path
-
-	scheduler := local.New(config)
-	defer os.Remove(path)
+	configTree, err := config.LoadTree(bytes.NewReader([]byte(schedulerWithEncryptConfig)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	scheduler, err := local.New(configTree.Get("schedule.local"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("test.db")
 
 	if err := scheduler.Start(ctx); err != nil {
 		t.Fatal("cannot start scheduler", err)
@@ -319,7 +343,14 @@ func TestStorage_Encryption(t *testing.T) {
 	}
 
 	// Attempt to open the database with no encryption
-	scheduler = local.New(config)
+	configTree, err = config.LoadTree(bytes.NewReader([]byte(schedulerConfig)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	scheduler, err = local.New(configTree.Get("schedule.local"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	err = scheduler.Start(ctx)
 	if err != nil {
@@ -327,7 +358,7 @@ func TestStorage_Encryption(t *testing.T) {
 	}
 
 	_, err = scheduler.At(ctx, at, "foo", expect)
-	if err == local.ErrMarshalling {
-		t.Error("expect job registration to fail")
+	if err != local.ErrUnmarshalling {
+		t.Error("expect job registration to fail without the encryption key")
 	}
 }

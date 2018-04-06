@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/log"
 )
 
 const Name = "logf"
 
-func New(c map[string]string) (log.Formatter, error) {
+func New(c config.Tree) (log.Formatter, error) {
 	return &Formatter{}, nil
 }
 

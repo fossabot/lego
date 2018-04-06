@@ -2,8 +2,6 @@ package stats
 
 import (
 	"time"
-
-	"github.com/stairlin/lego/log"
 )
 
 // Stats is an interface for app statistics
@@ -26,6 +24,4 @@ type Stats interface {
 	Timing(key string, t time.Duration, meta ...map[string]string)
 	// Histogram measures the distribution of values over the time
 	Histogram(key string, n interface{}, tags ...map[string]string)
-
-	SetLogger(l log.Logger)
 }

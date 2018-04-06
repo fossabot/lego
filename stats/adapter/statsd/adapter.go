@@ -2,11 +2,9 @@ package statsd
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/stairlin/lego/config"
-	"github.com/stairlin/lego/log"
 	"github.com/stairlin/lego/stats"
 )
 
@@ -19,8 +17,13 @@ var tagsFormats = map[string]TagFormat{
 	"datadog":  Datadog,
 }
 
-func New(c map[string]string) (stats.Stats, error) {
-	conf := extractConfig(c)
+func New(tree config.Tree) (stats.Stats, error) {
+	config := &Config{}
+	if err := tree.Unmarshal(config); err != nil {
+		return nil, err
+	}
+
+	conf := extractConfig(config)
 	client := &Client{
 		config: conf,
 	}
@@ -43,22 +46,15 @@ func New(c map[string]string) (stats.Stats, error) {
 type Client struct {
 	conn   *conn
 	config *adapterConfig
-	logger log.Logger
 	muted  bool
 }
 
 func (c *Client) Start() {
-	c.logger.Trace("stats.statsd.start", "opening connection...",
-		log.String("addr", c.conn.addr),
-	)
+
 }
 
 func (c *Client) Stop() {
 	c.close()
-}
-
-func (c *Client) SetLogger(l log.Logger) {
-	c.logger = l
 }
 
 func (c *Client) Count(key string, n interface{}, tags ...map[string]string) {
@@ -135,7 +131,7 @@ func converTags(m map[string]string) []tag {
 	return tags
 }
 
-func extractConfig(c map[string]string) *adapterConfig {
+func extractConfig(c *Config) *adapterConfig {
 	// The default configuration.
 	conf := &adapterConfig{
 		Client: clientConfig{
@@ -152,40 +148,23 @@ func extractConfig(c map[string]string) *adapterConfig {
 	}
 
 	// Address
-	if _, ok := c["port"]; ok {
-		addr := config.ValueOf(c["addr"])
-		port := config.ValueOf(c["port"])
-
-		conf.Conn.Addr = fmt.Sprintf("%s:%s", addr, port)
-	}
+	conf.Conn.Addr = fmt.Sprintf("%s:%s", c.Addr, c.Port)
 
 	// Tags format
-	if c["tags_format"] != "" {
-		conf.Conn.TagFormat = tagsFormats[c["tags_format"]]
+	if c.TagsFormat != "" {
+		conf.Conn.TagFormat = tagsFormats[c.TagsFormat]
 	}
 
 	// Global tags
 	// They are sent with each metric
 	// It can various things, such as node name, datacenter, ...
-	if tags, ok := c["tags"]; ok {
-		for _, item := range strings.Split(tags, ",") {
-			l := strings.Split(item, "=")
-
-			// If it has the correct format (key=value)
-			if len(l) == 2 {
-				t := tag{
-					K: l[0],
-					V: config.ValueOf(l[1]),
-				}
-
-				conf.Client.Tags = append(conf.Client.Tags, t)
-			}
+	for k, v := range c.Tags {
+		t := tag{
+			K: k,
+			V: v,
 		}
-	}
+		conf.Client.Tags = append(conf.Client.Tags, t)
 
-	// Prefi format
-	if c["tags_format"] != "" {
-		conf.Conn.TagFormat = tagsFormats[c["tags_format"]]
 	}
 
 	return conf

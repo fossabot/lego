@@ -21,6 +21,13 @@ type tag struct {
 	K, V string
 }
 
+type Config struct {
+	Addr       string            `toml:"addr"`
+	Port       string            `toml:"port"`
+	TagsFormat string            `toml:"tags_format"`
+	Tags       map[string]string `toml:"tags"`
+}
+
 type adapterConfig struct {
 	Client clientConfig
 	Conn   connConfig

@@ -7,12 +7,13 @@ package json
 import (
 	"encoding/json"
 
+	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/log"
 )
 
 const Name = "json"
 
-func New(c map[string]string) (log.Formatter, error) {
+func New(c config.Tree) (log.Formatter, error) {
 	return &Formatter{}, nil
 }
 

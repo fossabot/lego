@@ -34,15 +34,15 @@ type Server interface {
 type Reg struct {
 	mu sync.Mutex
 
-	ctx   app.Ctx
+	log   log.Logger
 	l     map[string]Server
 	drain bool
 }
 
 // NewReg builds a new registry
-func NewReg(ctx app.Ctx) *Reg {
+func NewReg(log log.Logger) *Reg {
 	return &Reg{
-		ctx: ctx,
+		log: log,
 		l:   map[string]Server{},
 	}
 }
@@ -62,7 +62,7 @@ func (r *Reg) Add(addr string, h Server) {
 }
 
 // Serve starts all registered servers
-func (r *Reg) Serve() error {
+func (r *Reg) Serve(ctx app.Ctx) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -70,7 +70,7 @@ func (r *Reg) Serve() error {
 		return ErrEmptyReg
 	}
 
-	r.ctx.Trace("server.serve.init", "Starting servers...")
+	r.log.Trace("server.serve.init", "Starting servers...")
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(r.l))
@@ -78,7 +78,7 @@ func (r *Reg) Serve() error {
 		go func(addr string, s Server) {
 			// Deregister itself upon completion
 			defer func() {
-				r.ctx.Trace("lego.serve.s.stop", "Server has stopped running",
+				r.log.Trace("lego.serve.s.stop", "Server has stopped running",
 					log.String("addr", addr),
 					log.Type("server", s),
 				)
@@ -87,15 +87,15 @@ func (r *Reg) Serve() error {
 				r.mu.Unlock()
 			}()
 
-			r.ctx.Trace("lego.serve.s", "Server starts serving",
+			r.log.Trace("lego.serve.s", "Server starts serving",
 				log.String("addr", addr),
 				log.Type("server", s),
 			)
 			wg.Done()
 			// TODO: Send pre-flight requests to make sure the server is ready
-			err := s.Serve(addr, r.ctx)
+			err := s.Serve(addr, ctx)
 			if err != nil {
-				r.ctx.Error("lego.serve.s", "Server error",
+				r.log.Error("lego.serve.s", "Server error",
 					log.String("addr", addr),
 					log.Error(err),
 				)
@@ -104,8 +104,7 @@ func (r *Reg) Serve() error {
 	}
 
 	wg.Wait() // Wait to boot all servers
-	r.ctx.Trace("server.serve.ready", "All servers are running")
-
+	r.log.Trace("server.serve.ready", "All servers are running")
 	return nil
 }
 
@@ -129,11 +128,11 @@ func (r *Reg) Drain() {
 	wg.Add(l)
 
 	// Drain servers
-	r.ctx.Trace("server.drain.init", "Start draining",
+	r.log.Trace("server.drain.init", "Start draining",
 		log.Int("servers", l),
 	)
 	for _, s := range r.l {
-		r.ctx.Trace("server.drain.s", "Drain server",
+		r.log.Trace("server.drain.s", "Drain server",
 			log.Type("server", s),
 		)
 		go func(s Server) {
@@ -145,7 +144,7 @@ func (r *Reg) Drain() {
 	wg.Wait()
 
 	r.drain = false
-	r.ctx.Trace("server.drain.done", "All servers have been drained")
+	r.log.Trace("server.drain.done", "All servers have been drained")
 }
 
 func (r *Reg) register(addr string, s Server) error {

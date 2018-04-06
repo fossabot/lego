@@ -1,6 +1,7 @@
 package printer
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 
@@ -14,11 +15,7 @@ func init() {
 }
 
 // Printer returns a new logger initialised with the given config
-type Printer func(config map[string]string) (log.Printer, error)
-
-func New(config *config.Log) (log.Printer, error) {
-	return newLogger(config.Printer.Adapter, config.Printer.Config)
-}
+type Printer func(config config.Tree) (log.Printer, error)
 
 var (
 	printersMu sync.RWMutex
@@ -56,14 +53,17 @@ func Register(name string, printer Printer) {
 	printers[name] = printer
 }
 
-// newLogger returns a new logger instance
-func newLogger(printer string, config map[string]string) (log.Printer, error) {
+// New returns a new logger instance
+func New(adapter string, config config.Tree) (log.Printer, error) {
 	printersMu.RLock()
 	defer printersMu.RUnlock()
 
-	if f, ok := printers[printer]; ok {
-		return f(config)
+	if adapter == "" {
+		return stdout.New(config.Get(stdout.Name))
 	}
 
-	return stdout.New(config)
+	if f, ok := printers[adapter]; ok {
+		return f(config)
+	}
+	return nil, fmt.Errorf("log printer not found <%s>", adapter)
 }

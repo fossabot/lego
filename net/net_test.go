@@ -15,7 +15,7 @@ import (
 // address can be registered once and only once
 func TestHandlerRegistration(t *testing.T) {
 	tt := lt.New(t)
-	reg := net.NewReg(tt.NewAppCtx("handler-test"))
+	reg := net.NewReg(tt.Logger())
 	addr := "localhost:8080"
 	h := NewDummyH()
 
@@ -38,8 +38,8 @@ func TestHandlerRegistration(t *testing.T) {
 // TestServe tests whether all handlers are correctly started
 func TestServe(t *testing.T) {
 	tt := lt.New(t)
-	ctx := tt.NewAppCtx("handler-test")
-	reg := net.NewReg(ctx)
+	ctx := tt.NewAppCtx(t.Name())
+	reg := net.NewReg(tt.Logger())
 
 	l := []struct {
 		h    *dummyH
@@ -59,7 +59,7 @@ func TestServe(t *testing.T) {
 	}
 
 	// Start serving
-	if err := reg.Serve(); err != nil {
+	if err := reg.Serve(ctx); err != nil {
 		t.Error("expect Serve to not return an error", err)
 	}
 
@@ -78,10 +78,10 @@ func TestServe(t *testing.T) {
 // is empty
 func TestServeEmptyRegistry(t *testing.T) {
 	tt := lt.New(t)
-	ctx := tt.NewAppCtx("handler-test")
-	reg := net.NewReg(ctx)
+	ctx := tt.NewAppCtx(t.Name())
+	reg := net.NewReg(tt.Logger())
 
-	if err := reg.Serve(); err != net.ErrEmptyReg {
+	if err := reg.Serve(ctx); err != net.ErrEmptyReg {
 		t.Error("expect Serve to return an error when the registry is empty", err)
 	}
 }
@@ -89,8 +89,8 @@ func TestServeEmptyRegistry(t *testing.T) {
 // TestDrain tests whether all handlers are properly drained
 func TestDrain(t *testing.T) {
 	tt := lt.New(t)
-	ctx := tt.NewAppCtx("handler-test")
-	reg := net.NewReg(ctx)
+	ctx := tt.NewAppCtx(t.Name())
+	reg := net.NewReg(tt.Logger())
 
 	l := []struct {
 		h    *dummyH
@@ -112,7 +112,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	// Start serving
-	if err := reg.Serve(); err != nil {
+	if err := reg.Serve(ctx); err != nil {
 		t.Error("expect Serve to not return an error", err)
 	}
 

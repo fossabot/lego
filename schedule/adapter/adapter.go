@@ -11,7 +11,7 @@ import (
 )
 
 // Adapter returns a new agent initialised with the given config
-type Adapter func(*config.Config) schedule.Scheduler
+type Adapter func(config.Tree) (schedule.Scheduler, error)
 
 var (
 	mu       sync.RWMutex
@@ -55,16 +55,23 @@ func Register(name string, adapter Adapter) {
 }
 
 // New creates a new scheduler
-func New(config *config.Config) (schedule.Scheduler, error) {
-	if !config.Scheduler.On {
-		return newNullScheduler(), nil
-	}
-
+func New(config config.Tree) (schedule.Scheduler, error) {
 	mu.RLock()
 	defer mu.RUnlock()
 
-	if f, ok := adapters[config.Scheduler.Adapter]; ok {
-		return f(config), nil
+	keys := config.Keys()
+	if len(keys) == 0 {
+		return Null(), nil
 	}
-	return nil, fmt.Errorf("schedule adapter not found <%s>", config.Disco.Adapter)
+	adapter := keys[0]
+
+	if f, ok := adapters[adapter]; ok {
+		return f(config.Get(adapter))
+	}
+	return nil, fmt.Errorf("schedule adapter not found <%s>", adapter)
+}
+
+// Null returns a scheduler that does not do anything
+func Null() schedule.Scheduler {
+	return newNullScheduler()
 }

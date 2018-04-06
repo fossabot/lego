@@ -12,20 +12,23 @@ import (
 )
 
 // New creates a new logger
-func New(service string, config *config.Log) (log.Logger, error) {
-	f, err := formatter.New(config)
+func New(service string, config config.Tree) (log.Logger, error) {
+	lc := &Config{}
+	config.Unmarshal(lc)
+
+	f, err := formatter.New(lc.Formatter, config.Get("formatter"))
 	if err != nil {
 		return nil, err
 	}
 
-	p, err := printer.New(config)
+	p, err := printer.New(lc.Printer, config.Get("printer"))
 	if err != nil {
 		return nil, err
 	}
 
 	return &Logger{
 		service:   service,
-		level:     log.ParseLevel(config.Level),
+		level:     log.ParseLevel(lc.Level),
 		fmt:       f,
 		pnt:       p,
 		calldepth: 1,
@@ -122,4 +125,11 @@ func (l *Logger) log(lvl log.Level, tag, msg string, fields ...log.Field) {
 	}
 
 	l.pnt.Print(&ctx, f)
+}
+
+// Config contains all log-related configuration
+type Config struct {
+	Level     string `toml:"level"`
+	Formatter string `toml:"formatter"`
+	Printer   string `toml:"printer"`
 }

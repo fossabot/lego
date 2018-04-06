@@ -11,7 +11,7 @@ import (
 )
 
 // Adapter returns a new agent initialised with the given config
-type Adapter func(*config.Config) (disco.Agent, error)
+type Adapter func(config.Tree) (disco.Agent, error)
 
 var (
 	mu       sync.RWMutex
@@ -55,16 +55,23 @@ func Register(name string, adapter Adapter) {
 }
 
 // New creates a new service discovery agent
-func New(config *config.Config) (disco.Agent, error) {
-	if !config.Disco.On {
-		return newLocalAgent(), nil
-	}
-
+func New(config config.Tree) (disco.Agent, error) {
 	mu.RLock()
 	defer mu.RUnlock()
 
-	if f, ok := adapters[config.Disco.Adapter]; ok {
-		return f(config)
+	keys := config.Keys()
+	if len(keys) == 0 {
+		return newLocalAgent(), nil
 	}
-	return nil, fmt.Errorf("disco adapter not found <%s>", config.Disco.Adapter)
+	adapter := keys[0]
+
+	if f, ok := adapters[adapter]; ok {
+		return f(config.Get(adapter))
+	}
+	return nil, fmt.Errorf("disco adapter not found <%s>", adapter)
+}
+
+// Local returns a service discovery agent that does just register local services
+func Local() disco.Agent {
+	return newLocalAgent()
 }

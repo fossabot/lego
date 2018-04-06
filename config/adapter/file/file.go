@@ -5,12 +5,11 @@
 package file
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	"io"
 	"net/url"
 	"os"
 
+	"github.com/pkg/errors"
 	a "github.com/stairlin/lego/config/adapter"
 )
 
@@ -20,31 +19,23 @@ const Name = "file"
 // New returns a new file config store
 func New(uri *url.URL) (a.Store, error) {
 	if _, err := os.Stat(uri.Path); os.IsNotExist(err) {
-		return nil, fmt.Errorf("file does not exist (%s) - %s", uri, err)
+		return nil, errors.Wrapf(err, "config file does not exist (%s)", uri)
 	}
 
 	return &Store{Path: uri.Path}, nil
 }
 
-// Store reads config from a JSON file
+// Store reads config from a file
 type Store struct {
 	Path string
 }
 
-// Load config for the given environment
-func (s *Store) Load(config interface{}) error {
+// Load implements Store
+func (s *Store) Load() (io.ReadCloser, error) {
 	// Load file
 	file, err := os.Open(s.Path)
 	if err != nil {
-		return fmt.Errorf("config file cannot be opened (%s)", err)
+		return nil, errors.Wrap(err, "config file cannot be opened")
 	}
-
-	// Read file
-	r, err := ioutil.ReadAll(file)
-	if err != nil {
-		return fmt.Errorf("config file cannot be read (%s)", err)
-	}
-
-	// Unmarshal
-	return json.Unmarshal(r, config)
+	return file, nil
 }
