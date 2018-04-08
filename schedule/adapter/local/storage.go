@@ -1,6 +1,7 @@
 package local
 
 import (
+	"encoding/base64"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,16 +48,25 @@ type storage struct {
 	checkpoint int64
 }
 
-func newStorage(c *EncryptionConfig) *storage {
+func newStorage(c *EncryptionConfig) (*storage, error) {
 	storage := &storage{}
 	if c != nil {
 		keys := make(map[uint32][]byte)
-		for i, v := range c.Keys {
-			keys[uint32(i)] = []byte(v)
+		for i, key := range c.Keys {
+			decodedKey, err := base64.StdEncoding.DecodeString(key)
+			if err != nil {
+				return nil, errors.Wrapf(err, "cannot decode storage key #%d", i)
+			}
+			if len(decodedKey) != crypto.KeySize {
+				return nil, errors.Errorf(
+					"invalid encryption key length %d != %d", len(decodedKey), crypto.KeySize,
+				)
+			}
+			keys[uint32(i)] = decodedKey
 		}
 		storage.crypto = crypto.NewRotor(keys, c.Default)
 	}
-	return storage
+	return storage, nil
 }
 
 // Open opens the database. This function must be called first.
@@ -218,7 +228,7 @@ func (s *storage) loadLastCheckpoint() (t int64) {
 
 		cp := pb.Checkpoint{}
 		if err := s.unmarshal(data, &cp); err != nil {
-			return err
+			return ErrUnmarshalling
 		}
 		if cp.Seq == checkpoints.Sequence() {
 			t = cp.To
@@ -256,7 +266,7 @@ func (s *storage) unmarshal(buf []byte, pb proto.Message) error {
 
 	plain, err := s.crypto.Decrypt(buf)
 	if err != nil {
-		return ErrUnmarshalling
+		return err
 	}
 	return proto.Unmarshal(plain, pb)
 }

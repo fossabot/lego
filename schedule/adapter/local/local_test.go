@@ -25,7 +25,7 @@ var schedulerWithEncryptConfig = []byte(`
 
 [schedule.local.encryption]
   default = 0
-  keys = ["fe1e22b23c90b4fb1f9b758979d9c06c"]`)
+  keys = ["HldTqnRguKViCmSQfrHTUk44vOaUCqpsnMZQDNzN7FTNeH0LOgBW2bdbCYANPaKzr+6whIwQ51aSbU9SRfrTfQ=="]`)
 
 func Test_Init(t *testing.T) {
 	tt := lt.New(t)
@@ -324,10 +324,10 @@ func TestStorage_Encryption(t *testing.T) {
 
 	at := time.Now().Add(time.Millisecond)
 	if _, err := scheduler.At(ctx, at, "foo", expect); err != nil {
-		t.Fatal("cannot schedule job")
+		t.Fatal("cannot schedule job", err)
 	}
 	if _, err := scheduler.At(ctx, at, "foo", expect); err != nil {
-		t.Fatal("cannot schedule job")
+		t.Fatal("cannot schedule job", err)
 	}
 
 	scheduler.Drain()

@@ -92,10 +92,13 @@ func New(tree config.Tree) (schedule.Scheduler, error) {
 	}, nil
 }
 
-func (s *scheduler) Start(ctx app.Ctx) error {
+func (s *scheduler) Start(ctx app.Ctx) (err error) {
 	s.ctx = ctx
 	s.processor = newProcessor(s.config.Workers, s.process)
-	s.storage = newStorage(s.config.Encryption)
+	s.storage, err = newStorage(s.config.Encryption)
+	if err != nil {
+		return err
+	}
 	s.watcher = newWatcher(s.storage, s.processor.Exec())
 
 	if err := s.storage.Open(s.config.DB); err != nil {

@@ -10,7 +10,20 @@ import (
 )
 
 const (
-	defaultNonceSize = 12
+	// CKeySize is the cipher key size - AES-256
+	CKeySize = 32
+	// MKeySize is the HMAC key size - HMAC-SHA-256
+	MKeySize = 32
+	// KeySize is the encryption key size
+	KeySize = CKeySize + MKeySize
+	// AESNonceSize is an AES nonce size
+	AESNonceSize = aes.BlockSize
+	// GCMNonceSize is a GCM nonce size
+	GCMNonceSize = 12
+	// SenderSize is the size allocated to add the sender ID
+	SenderSize = 4
+	// MACSize MAC size
+	MACSize = 32
 )
 
 var (
@@ -23,7 +36,7 @@ var (
 
 // Encrypt secures a message using AES-GCM.
 func Encrypt(key, message []byte) ([]byte, error) {
-	c, err := aes.NewCipher(key)
+	c, err := aes.NewCipher(key[:CKeySize])
 	if err != nil {
 		return nil, ErrEncrypt
 	}
@@ -33,7 +46,7 @@ func Encrypt(key, message []byte) ([]byte, error) {
 		return nil, ErrEncrypt
 	}
 
-	nonce, err := genRandBytes(defaultNonceSize)
+	nonce, err := genRandBytes(GCMNonceSize)
 	if err != nil {
 		return nil, ErrEncrypt
 	}
@@ -47,11 +60,11 @@ func Encrypt(key, message []byte) ([]byte, error) {
 
 // Decrypt recovers a message secured using AES-GCM.
 func Decrypt(key, message []byte) ([]byte, error) {
-	if len(message) <= defaultNonceSize {
+	if len(message) <= GCMNonceSize {
 		return nil, ErrDecrypt
 	}
 
-	c, err := aes.NewCipher(key)
+	c, err := aes.NewCipher(key[:CKeySize])
 	if err != nil {
 		return nil, ErrDecrypt
 	}
@@ -61,10 +74,10 @@ func Decrypt(key, message []byte) ([]byte, error) {
 		return nil, ErrDecrypt
 	}
 
-	nonce := make([]byte, defaultNonceSize)
+	nonce := make([]byte, GCMNonceSize)
 	copy(nonce, message)
 
-	out, err := gcm.Open(nil, nonce, message[defaultNonceSize:], nil)
+	out, err := gcm.Open(nil, nonce, message[GCMNonceSize:], nil)
 	if err != nil {
 		return nil, ErrDecrypt
 	}
@@ -87,7 +100,7 @@ func NewRotor(keys map[uint32][]byte, defaultSender uint32) *Rotor {
 	return &Rotor{
 		keys:          keys,
 		defaultSender: defaultSender,
-		NonceSize:     defaultNonceSize,
+		NonceSize:     GCMNonceSize,
 	}
 }
 
@@ -106,7 +119,7 @@ func (r *Rotor) EncryptWithSender(message []byte, sender uint32) ([]byte, error)
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, sender)
 
-	c, err := aes.NewCipher(key)
+	c, err := aes.NewCipher(key[:CKeySize])
 	if err != nil {
 		return nil, ErrEncrypt
 	}
@@ -140,7 +153,7 @@ func (r *Rotor) Decrypt(message []byte) ([]byte, error) {
 		return nil, ErrDecrypt
 	}
 
-	c, err := aes.NewCipher(key)
+	c, err := aes.NewCipher(key[:CKeySize])
 	if err != nil {
 		return nil, ErrDecrypt
 	}

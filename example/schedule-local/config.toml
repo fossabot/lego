@@ -15,7 +15,7 @@ version = "test"
 
 [schedule.local.encryption]
   default = 0
-  keys = ["fe1e22b23c90b4fb1f9b758979d9c06c"]
+  keys = ["7sYSoIRC5mWCbOsBZDuaqjHoLI8trIi1TTMXRwqCs5fWtzXDd/R0QhssAIgWVKzKT4wwCLwxoD7VDb1Vs/mxmQ=="]
 
 [app]
   foo = "bar"
