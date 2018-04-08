@@ -40,6 +40,7 @@ func main() {
 	// Cache random data
 	grp := app.Cache().NewGroup("foo", 64<<20, cache.LoadFunc(
 		func(ctx journey.Ctx, key string) ([]byte, error) {
+			ctx.Warning("cache.load", "Filling cache...", log.String("key", key))
 			return []byte(app.Config().Node), nil
 		},
 	))
