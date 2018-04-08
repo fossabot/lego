@@ -4,18 +4,19 @@
 package main
 
 import (
-	"context"
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/stairlin/lego"
 	"github.com/stairlin/lego/cache"
+	"github.com/stairlin/lego/ctx/app"
+	"github.com/stairlin/lego/ctx/journey"
 	"github.com/stairlin/lego/log"
-	netCache "github.com/stairlin/lego/net/cache"
-	"github.com/stairlin/lego/net/naming"
+	"github.com/stairlin/lego/net/http"
 )
 
 type AppConfig struct {
@@ -36,34 +37,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	port, err := strconv.Atoi(os.Getenv("CACHE_PORT"))
-	if err != nil {
-		fmt.Println("Problem parsing port", err)
-		os.Exit(1)
-	}
-	tags := []string{"v1"}
-
-	// Register cache service
-	cacheServer := netCache.NewServer(app.Ctx().Cache())
-	app.RegisterService(&lego.ServiceRegistration{
-		Name:   "api.cache",
-		Host:   "127.0.0.1",
-		Port:   uint16(port),
-		Server: cacheServer,
-		Tags:   tags,
-	})
-
-	// Listen to service updates
-	w, err := naming.Resolve(app.Ctx(), "disco://api.cache?tag=v1")
-	if err != nil {
-		fmt.Println("Problem building watcher", err)
-		os.Exit(1)
-	}
-	cacheServer.SetOptions(netCache.OptWatcher(w))
-
 	// Cache random data
-	grp := cacheServer.NewGroup("foo", 64<<20, cache.LoadFunc(
-		func(ctx context.Context, key string) ([]byte, error) {
+	grp := app.Cache().NewGroup("foo", 64<<20, cache.LoadFunc(
+		func(ctx journey.Ctx, key string) ([]byte, error) {
 			return []byte(app.Config().Node), nil
 		},
 	))
@@ -73,7 +49,8 @@ func main() {
 				return
 			}
 			key := genRandomString()
-			v, err := grp.Get(app.Ctx(), key)
+			ctx := journey.New(app.Ctx())
+			v, err := grp.Get(ctx, key)
 			if err != nil {
 				app.Ctx().Error("example.cache.err", "Error loading data",
 					log.Error(err),
@@ -85,6 +62,15 @@ func main() {
 			time.Sleep(time.Second * time.Duration(rand.Int63n(15)))
 		}
 	}()
+
+	// Register HTTP handler
+	h := handler{
+		ctx:   app.Ctx(),
+		cache: grp,
+	}
+	s := http.NewServer()
+	s.HandleFunc("/cache/{key}", http.GET, h.Load)
+	app.RegisterServer("127.0.0.1:3000", s)
 
 	// Start serving requests
 	err = app.Serve()
@@ -100,4 +86,21 @@ func genRandomString() string {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+type handler struct {
+	ctx   app.Ctx
+	cache cache.Group
+}
+
+// Cache handler example
+func (h *handler) Load(ctx journey.Ctx, w http.ResponseWriter, r *http.Request) {
+	ctx.Trace("http.cache.load", "Load data", log.String("key", r.Params["key"]))
+	v, err := h.cache.Get(ctx, r.Params["key"])
+	if err != nil {
+		ctx.Warning("http.cache.err", "Error pulling data from cache", log.Error(err))
+		w.Head(http.StatusInternalServerError)
+		return
+	}
+	w.Data(http.StatusOK, "text/plain", ioutil.NopCloser(bytes.NewReader(v)))
 }

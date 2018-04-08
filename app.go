@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stairlin/lego/bg"
 	"github.com/stairlin/lego/cache"
+	cacheA "github.com/stairlin/lego/cache/adapter"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx/app"
 	"github.com/stairlin/lego/disco"
@@ -124,7 +125,10 @@ func NewWithConfig(
 	if err != nil {
 		return nil, errors.Wrap(err, "error initialising scheduler")
 	}
-	a.cache = cache.New() // TODO: Cache adapter
+	a.cache, err = cacheA.New(configTree.Get("cache"), a)
+	if err != nil {
+		return nil, errors.Wrap(err, "error initialising cache")
+	}
 
 	// Trap OS signals
 	go trapSignals(a)

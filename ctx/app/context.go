@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/stairlin/lego/bg"
-	"github.com/stairlin/lego/cache"
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/ctx"
 	"github.com/stairlin/lego/disco"
@@ -27,7 +26,6 @@ type Ctx interface {
 	Config() *config.Config
 	BG() *bg.Reg
 	Disco() disco.Agent
-	Cache() cache.Cache
 	Drain()
 	Cancel()
 }
@@ -37,7 +35,6 @@ type context struct {
 	appConfig  *config.Config
 	bgReg      *bg.Reg
 	disco      disco.Agent
-	cache      cache.Cache
 	c          goc.Context
 	cancelFunc goc.CancelFunc
 	service    string
@@ -70,7 +67,6 @@ func NewCtx(
 		appConfig:  c,
 		bgReg:      reg,
 		disco:      sd,
-		cache:      cache.New(),
 		c:          ctx,
 		cancelFunc: cancelFunc,
 		l:          l.AddCalldepth(1),
@@ -101,10 +97,6 @@ func (c *context) BG() *bg.Reg {
 
 func (c *context) Disco() disco.Agent {
 	return c.disco
-}
-
-func (c *context) Cache() cache.Cache {
-	return c.cache
 }
 
 func (c *context) Drain() {

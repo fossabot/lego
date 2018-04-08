@@ -46,6 +46,11 @@ func LoadTree(r io.Reader) (Tree, error) {
 	return &tree{t: t}, nil
 }
 
+// NullTree returns an empty tree
+func NullTree() Tree {
+	return &nullTree{}
+}
+
 // tree wraps a TOML tree
 type tree struct {
 	t *toml.Tree

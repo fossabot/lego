@@ -21,3 +21,7 @@ start6:
 
 start7:
 		NODE_NAME=node-g CACHE_PORT=3006 CONFIG_URI=file://${PWD}/config.toml go run main.go
+
+pull:
+		@curl "http://127.0.0.1:3000/cache/A"
+		@echo ""
