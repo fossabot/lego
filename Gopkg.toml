@@ -26,8 +26,8 @@
   version = "1.6.0"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/golang/protobuf"
+  version = "1.0.0"
 
 [[constraint]]
   name = "github.com/gorilla/mux"
@@ -52,7 +52,3 @@
 [[constraint]]
   name = "google.golang.org/grpc"
   version = "1.11.2"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/golang/groupcache"

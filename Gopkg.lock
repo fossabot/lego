@@ -20,19 +20,6 @@
   version = "v1.0.0"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/golang/groupcache"
-  packages = [
-    ".",
-    "consistenthash",
-    "groupcachepb",
-    "lru",
-    "singleflight"
-  ]
-  revision = "66deaeb636dff1ac7d938ce666d090556056a4b0"
-
-[[projects]]
-  branch = "master"
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
@@ -42,7 +29,8 @@
     "ptypes/duration",
     "ptypes/timestamp"
   ]
-  revision = "e09c5db296004fbe3f74490e84dcd62c3c5ddb1b"
+  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -65,8 +53,8 @@
 [[projects]]
   name = "github.com/hashicorp/consul"
   packages = ["api"]
-  revision = "9a494b5fb9c86180a5702e29c485df1507a47198"
-  version = "v1.0.6"
+  revision = "fb848fc48818f58690db09d14640513aa6bf3c02"
+  version = "v1.0.7"
 
 [[projects]]
   branch = "master"
@@ -124,6 +112,7 @@
   name = "golang.org/x/net"
   packages = [
     "context",
+    "http/httpguts",
     "http2",
     "http2/hpack",
     "idna",
@@ -131,13 +120,13 @@
     "lex/httplex",
     "trace"
   ]
-  revision = "b3c676e531a6dc479fa1b35ac961c13f5e2b4d2e"
+  revision = "5f9ae10d9af5b1c89ae6904293b14b064d4ada23"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "3b87a42e500a6dc65dae1a55d0b641295971163e"
+  revision = "79b0c6888797020a994db17c8510466c72fe75d9"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -164,7 +153,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "aae13d27a44d62f039eeeb93e74e893886673932"
+  revision = "7fd901a49ba6a7f87732eb344f6e3c5b19d1b200"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -195,12 +184,12 @@
     "tap",
     "transport"
   ]
-  revision = "d89cded64628466c4ab532d1f0ba5c220459ebe8"
-  version = "v1.11.2"
+  revision = "d11072e7ca9811b1100b80ca0269ac831f06d024"
+  version = "v1.11.3"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "51e67eb306d80cd77faf9b0c6603614f557f28ab83defd880511d9c07a093ecb"
+  inputs-digest = "c5ed1342816d0baaec16a5aae44e27396b1ddc2735b3b8322bab2fda645c12e2"
   solver-name = "gps-cdcl"
   solver-version = 1
