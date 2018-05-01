@@ -80,6 +80,10 @@ func (l *Logger) AddCalldepth(n int) log.Logger {
 	return c
 }
 
+func (l *Logger) Close() error {
+	return l.pnt.Close()
+}
+
 func (l *Logger) clone() *Logger {
 	return &Logger{
 		service:   l.service,

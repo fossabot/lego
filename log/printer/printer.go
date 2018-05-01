@@ -7,11 +7,13 @@ import (
 
 	"github.com/stairlin/lego/config"
 	"github.com/stairlin/lego/log"
+	"github.com/stairlin/lego/log/printer/file"
 	"github.com/stairlin/lego/log/printer/stdout"
 )
 
 func init() {
 	Register(stdout.Name, stdout.New)
+	Register(file.Name, file.New)
 }
 
 // Printer returns a new logger initialised with the given config
@@ -63,7 +65,7 @@ func New(adapter string, config config.Tree) (log.Printer, error) {
 	}
 
 	if f, ok := printers[adapter]; ok {
-		return f(config)
+		return f(config.Get(adapter))
 	}
 	return nil, fmt.Errorf("log printer not found <%s>", adapter)
 }

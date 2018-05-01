@@ -60,6 +60,9 @@ type Logger interface {
 	// Calldepth is the count of the number of
 	// frames to skip when computing the file name and line number
 	AddCalldepth(n int) Logger
+
+	// Close implements the Closer interface
+	Close() error
 }
 
 // Formatter converts a log line to a specific format, such as JSON
@@ -72,6 +75,9 @@ type Formatter interface {
 type Printer interface {
 	// Print prints the given log line
 	Print(ctx *Ctx, s string) error
+
+	// Close implements the Closer interface
+	Close() error
 }
 
 // Ctx carries the log line context (level, timestamp, ...)

@@ -75,6 +75,9 @@ func (l *Logger) AddCalldepth(n int) log.Logger {
 	nl.calldepth = nl.calldepth + n
 	return nl
 }
+func (l *Logger) Close() error {
+	return nil
+}
 
 func format(tag, msg string, fields ...log.Field) string {
 	var b bytes.Buffer

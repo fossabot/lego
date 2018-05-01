@@ -289,6 +289,7 @@ func (a *App) Close() error {
 func (a *App) close() {
 	a.schedule.Close()
 	a.appCtx.Cancel()
+	a.log.Close()
 
 	select {
 	case a.stopc <- struct{}{}:

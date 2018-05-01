@@ -31,6 +31,10 @@ func (l *Logger) Print(ctx *log.Ctx, s string) error {
 	return nil
 }
 
+func (l *Logger) Close() error {
+	return nil
+}
+
 func pickColour(lvl string) *color.Color {
 	switch lvl {
 	case "TR":
