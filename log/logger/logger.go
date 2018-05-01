@@ -14,7 +14,7 @@ import (
 // New creates a new logger
 func New(service string, config config.Tree) (log.Logger, error) {
 	lc := &Config{}
-	config.Unmarshal(lc)
+	config.Get("logger").Unmarshal(lc)
 
 	f, err := formatter.New(lc.Formatter, config.Get("formatter"))
 	if err != nil {
