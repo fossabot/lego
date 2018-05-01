@@ -15,6 +15,7 @@ const (
 
 	defaultMode = 0660
 	flag        = os.O_CREATE | os.O_WRONLY | os.O_APPEND
+	newLine     = '\n'
 )
 
 // Config defines the filer printer config
@@ -51,7 +52,7 @@ type Logger struct {
 }
 
 func (l *Logger) Print(ctx *log.Ctx, s string) error {
-	_, err := l.W.Write([]byte(s))
+	_, err := l.W.Write(append([]byte(s), newLine))
 	return err
 }
 
