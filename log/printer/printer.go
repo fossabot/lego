@@ -56,9 +56,14 @@ func Register(name string, printer Printer) {
 }
 
 // New returns a new logger instance
-func New(adapter string, config config.Tree) (log.Printer, error) {
+func New(config config.Tree) (log.Printer, error) {
 	printersMu.RLock()
 	defer printersMu.RUnlock()
+
+	var adapter string
+	if len(config.Keys()) > 0 {
+		adapter = config.Keys()[0]
+	}
 
 	if adapter == "" {
 		return stdout.New(config.Get(stdout.Name))

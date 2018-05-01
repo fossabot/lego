@@ -56,9 +56,14 @@ func Register(name string, adapter Adapter) {
 }
 
 // New returns a new logger instance
-func New(adapter string, config config.Tree) (log.Formatter, error) {
+func New(config config.Tree) (log.Formatter, error) {
 	adaptersMu.RLock()
 	defer adaptersMu.RUnlock()
+
+	var adapter string
+	if len(config.Keys()) > 0 {
+		adapter = config.Keys()[0]
+	}
 
 	if adapter == "" {
 		return logf.New(config.Get(logf.Name))
