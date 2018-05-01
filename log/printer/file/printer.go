@@ -2,8 +2,9 @@
 package file
 
 import (
-	"io"
+	"bufio"
 	"os"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/stairlin/lego/config"
@@ -41,21 +42,33 @@ func New(tree config.Tree) (log.Printer, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open log file")
 	}
+	buf := bufio.NewWriter(f)
 
 	return &Logger{
-		W: f,
+		buf:  buf,
+		file: f,
 	}, nil
 }
 
 type Logger struct {
-	W io.WriteCloser
+	mu sync.Mutex
+
+	buf  *bufio.Writer
+	file *os.File
 }
 
 func (l *Logger) Print(ctx *log.Ctx, s string) error {
-	_, err := l.W.Write(append([]byte(s), newLine))
-	return err
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	_, err := l.buf.WriteString(s)
+	if err != nil {
+		return err
+	}
+	return l.buf.WriteByte(newLine)
 }
 
 func (l *Logger) Close() error {
-	return l.W.Close()
+	l.buf.Flush()
+	return l.file.Close()
 }
