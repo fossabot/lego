@@ -1,5 +1,4 @@
-# lego [![CircleCI](https://circleci.com/gh/stairlin/lego.svg?style=svg)](https://circleci.com/gh/stairlin/lego) [![Go Report Card](https://goreportcard.com/badge/github.com/stairlin/lego)](https://goreportcard.com/report/github.com/stairlin/lego)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fstairlin%2Flego.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fstairlin%2Flego?ref=badge_shield)
+# lego [![CircleCI](https://circleci.com/gh/stairlin/lego.svg?style=svg)](https://circleci.com/gh/stairlin/lego) [![Go Report Card](https://goreportcard.com/badge/github.com/stairlin/lego)](https://goreportcard.com/report/github.com/stairlin/lego) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fstairlin%2Flego.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fstairlin%2Flego?ref=badge_shield)
 
 ## Why
 
